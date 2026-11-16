@@ -18,9 +18,9 @@
 
 /* Automatic answers and compact account history */
 [hidden]{display:none!important}
-.option.answer-good{background:#e8f8ec;border-color:#258045;color:#166b30}
-.option.answer-bad{background:#fff0ef;border-color:#cc3d36;color:#992c21}
-.option.answer-solution{background:#fff0ef;border:2px dashed #cc3d36;color:#992c21}
+.option.answer-good,.option.answer-good:has(input:checked){background:#e8f8ec;border-color:#258045;color:#166b30}
+.option.answer-bad,.option.answer-bad:has(input:checked){background:#fff0ef;border-color:#cc3d36;color:#992c21}
+.option.answer-solution,.option.answer-solution:has(input:checked){background:#fff0ef;border:2px dashed #cc3d36;color:#992c21}
 .option:has(input:disabled){cursor:default}
 .option .answer-label{font-size:11px;font-weight:800;align-self:center;flex-shrink:0}
 .preserve-lines{white-space:pre-wrap;overflow-wrap:anywhere}
