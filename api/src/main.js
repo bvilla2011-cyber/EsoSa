@@ -12,7 +12,19 @@ function fabrica(mode){
    const tipus=mode==='lexic'?'Lèxic':'Dites';
    const ordre=barreja(data);
    const test=ordre.map(([mot,def])=>{
-      const errors=barreja([...new Set(data.filter(x=>x[0]!==mot && x[1]!==def).map(x=>x[1]))]).slice(0,2);
+      // Evitem opcions sinònimes que puguin ser totes correctes.
+      const iguals=[
+        ["n'estic tip","n'estic fart"],
+        ["m'és igual","tant me fa","tant se me'n dóna"],
+        ["tant se val","això rai!","no hi fa res"],
+        ["què hi farem!","què vols fer-hi!","no hi ha res a fer"],
+        ["remugar","rondinar","renegar"],
+        ["desmanegar-se","desmuntar-se"],
+        ["caure","estimbar-se","ensorrar-se","enfonsar"],
+        ["plegar","enllestir","exhaurir-se"]
+      ];
+      const massaSemblant=altra=>iguals.some(g=>g.includes(mot)&&g.includes(altra));
+      const errors=barreja([...new Set(data.filter(x=>x[0]!==mot && x[1]!==def && !massaSemblant(x[0])).map(x=>x[1]))]).slice(0,2);
       return {tipus:'test',fase:'TEST',enunciat:'Què vol dir «'+mot+'»?',opcions:barreja([def,...errors]),correcta:def};
    });
    const escriu=barreja(data).slice(0,mode==='lexic'?15:10).map(([mot,def])=>({
