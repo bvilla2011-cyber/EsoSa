@@ -133,13 +133,28 @@ export default async ({req,res,error})=>{
       }
     }
   };
+  const presenceMap=(raw)=>{
+    let data={};try{data=JSON.parse(raw||'{}')}catch{}
+    if(!data||typeof data!=='object'||Array.isArray(data))return {};
+    return Object.fromEntries(Object.entries(data).filter(([k,v])=>v&&Number.isFinite(v.at)&&Date.now()-v.at<75000).slice(-12));
+  };
+  if(action==='presence'){
+    const tab=String(body.tab||'');
+    if(!/^[a-zA-Z0-9-]{8,64}$/.test(tab)||!['online','playing','offline'].includes(body.status))
+      return res.json({error:'Presència no vàlida.'},400);
+    const p=await perfil(),sessions=presenceMap(p.presencia);
+    if(body.status==='offline')delete sessions[tab];
+    else sessions[tab]={at:Date.now(),status:body.status};
+    await write(PERFILS,userId,{presencia:JSON.stringify(sessions)});
+    return res.json({ok:true});
+  }
   if(action==='me'){
     const p=await perfil();
     return res.json({nom:p.nom,punts:p.punts,partides:p.partides,encerts:p.encerts,errors:p.errors,dominat:p.punts>=10000});
   }
   if(action==='ranking'){
     const r=await tables.listRows({databaseId:DB,tableId:PERFILS,queries:[Query.orderDesc('punts'),Query.limit(100)]});
-    return res.json({ranking:(r.rows||r.documents||[]).map((x,i)=>({posicio:i+1,nom:x.nom,punts:x.punts,partides:x.partides}))});
+    return res.json({ranking:(r.rows||r.documents||[]).map((x,i)=>({id:x.$id,posicio:i+1,nom:x.nom,punts:x.punts,partides:x.partides,presencia:Object.values(presenceMap(x.presencia)).some(v=>v.status==='playing')?'playing':Object.keys(presenceMap(x.presencia)).length?'online':null}))});
   }
   if(action==='history'){
     const all=await tables.listRows({databaseId:DB,tableId:PARTIDES,queries:[Query.equal('usuari',userId),Query.equal('acabat',true),Query.orderDesc('$createdAt'),Query.limit(15)]});
