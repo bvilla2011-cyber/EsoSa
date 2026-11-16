@@ -290,7 +290,7 @@
     try{
       const data=await api({action:'ranking'});
       if(!document.getElementById('list'))return;
-      const players=data.ranking;
+      const players=data.ranking.filter(p=>Number(p.partides)>0);
       const fmt=n=>Number(n||0).toLocaleString('ca-ES');
       const ordinal=n=>n===1?'1r':n===2?'2n':n===3?'3r':n===4?'4t':n+'è';
       // Older server responses have no user ID; avoid marking duplicate names as the current player.
