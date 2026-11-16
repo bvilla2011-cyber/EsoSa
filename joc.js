@@ -290,7 +290,22 @@
     try{
       const data=await api({action:'ranking'});
       if(!document.getElementById('list'))return;
-      document.getElementById('list').innerHTML=data.ranking.length?'<table class="ranking"><thead><tr><th>Posició</th><th>Jugador</th><th>Punts</th></tr></thead><tbody>'+data.ranking.map((p,i)=>'<tr'+(p.nom===state.user?.name?' class="me"':'')+'><td>'+(i+1)+'</td><td>'+escapeHTML(p.nom)+'</td><td><strong>'+p.punts+'</strong></td></tr>').join('')+'</tbody></table>':'<p>Encara no hi ha jugadors al rànquing. Comença la primera partida!</p>';
+      const players=data.ranking;
+      const fmt=n=>Number(n||0).toLocaleString('ca-ES');
+      const ordinal=n=>n===1?'1r':n===2?'2n':n===3?'3r':n===4?'4t':n+'è';
+      // Older server responses have no user ID; avoid marking duplicate names as the current player.
+      const uniqueName=players.filter(p=>p.nom===state.user?.name).length===1;
+      const isMe=p=>p.id?p.id===state.user?.$id:uniqueName&&p.nom===state.user?.name;
+      const medals=['🥇','🥈','🥉'],titles=['Primer','Segon','Tercer'];
+      const podium=players.slice(0,3).map((p,i)=>
+        '<article class="podium-card podium-'+i+'"><span class="podium-medal" aria-hidden="true">'+medals[i]+'</span><span class="podium-place">'+titles[i]+'</span><strong class="podium-name">'+escapeHTML(p.nom)+'</strong><span class="podium-points">'+fmt(p.punts)+' <small>punts</small></span></article>'
+      ).join('');
+      document.getElementById('list').innerHTML=players.length?
+        '<div class="rank-podium" aria-label="Podi del rànquing">'+podium+'</div><div class="rank-caption"><span>Classificació · '+players.length+' jugadors'+(players.length===100?' (top 100)':'')+'</span><span>+10 per encert</span></div><table class="ranking ranking-fresh"><thead><tr><th scope="col">Posició</th><th scope="col">Jugador</th><th scope="col">Punts</th></tr></thead><tbody>'+
+        players.map((p,i)=>'<tr'+(isMe(p)?' class="me"':'')+'><td><span class="rank-position">'+(i<3?'<span aria-hidden="true">'+medals[i]+'</span>':'')+ordinal(i+1)+'</span></td><td><span class="rank-name">'+escapeHTML(p.nom)+'</span>'+(isMe(p)?'<span class="rank-you">Tu</span>':'')+'<small class="rank-games">'+fmt(p.partides)+' partides</small></td><td><strong>'+fmt(p.punts)+'</strong></td></tr>').join('')+
+        '</tbody></table><p class="hint rank-footnote">Cada resposta compta. Practica una mica més i puja posicions.</p>':
+        '<div class="rank-empty"><span aria-hidden="true">🏆</span><h2>El primer lloc t’espera</h2><p class="sub">Completa una partida i estrena el rànquing.</p></div>';
+
     }catch(e){msg(errorMessage(e),true);const list=document.getElementById('list');if(list)list.innerHTML='';}
   }
   async function bootstrap(){
