@@ -21,7 +21,7 @@
         if(state.run) await api({action:'leave',partida:state.run});
         await account.deleteSession({sessionId:'current'});
         state.user=null;state.run=null;state.question=null;renderAuth();
-      }catch(e){msg('No s\\'ha pogut desar i sortir: '+errorMessage(e),true);}
+      }catch(e){msg('Error en desar i sortir: '+errorMessage(e),true);}
       finally{state.busy=false;}
     });
   }
@@ -123,7 +123,7 @@
       const result=resposta.resultat;
       msg('Partida guardada! '+(result.punts>=0?'+':'')+result.punts+' punts. Ara tens '+result.total+' punts acumulats.',false);
     }catch(e){
-      msg('No s\\'han pogut desar els punts: '+errorMessage(e),true);
+      msg('Error en desar els punts: '+errorMessage(e),true);
       if(button){button.disabled=false;button.textContent='SORTIR I DESAR PUNTS';}
     }finally{state.busy=false;}
   }
