@@ -96,6 +96,15 @@ export default async ({req,res,error})=>{
     const r=await tables.listRows({databaseId:DB,tableId:PERFILS,queries:[Query.orderDesc('punts'),Query.limit(100)]});
     return res.json({ranking:(r.rows||r.documents||[]).map((x,i)=>({posicio:i+1,nom:x.nom,punts:x.punts,partides:x.partides}))});
   }
+  if(action==='history'){
+    const all=await tables.listRows({databaseId:DB,tableId:PARTIDES,queries:[Query.equal('usuari',userId),Query.equal('acabat',true),Query.orderDesc('$createdAt'),Query.limit(15)]});
+    const partides=(all.rows||all.documents||[]).map(x=>{
+      let quantitat=0;
+      try{quantitat=JSON.parse(x.preguntes).length;}catch{}
+      return {mode:x.mode,nota:quantitat?Math.round(10*x.encerts/quantitat*10)/10:0,punts:x.guany,encerts:x.encerts,errors:x.errors,data:x.$createdAt};
+    });
+    return res.json({partides});
+  }
   if(action==='start'){
     if(!['lexic','dites','catanyol'].includes(body.mode))return res.json({error:'Modalitat incorrecta.'},400);
     await perfil();
