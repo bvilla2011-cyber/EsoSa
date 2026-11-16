@@ -9,7 +9,7 @@
   const state={user:null,tab:'login',email:'',tokenUserId:'',run:null,question:null,answerReply:null,points:0,mode:'',busy:false};
   const escapeHTML=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
   const label=mode=>({lexic:'Lèxic',dites:'Dites',catanyol:'Catanyol'})[mode]||'Practicar';
-  function show(html){el.innerHTML=html;}
+  function show(html){el.innerHTML=html;sendPresence();}
   function errorMessage(e){
     if(e?.code===429)return 'Massa intents. Espera uns minuts abans de tornar-ho a provar.';
     if(e?.type==='user_invalid_credentials')return 'Correu o contrasenya incorrectes.';
@@ -43,6 +43,29 @@
     state.mode=r.mode||mode;state.run=r.partida;state.question=r.pregunta;
     state.points=r.puntuacio;state.answerReply=null;renderQuestion();
   }
+
+  const presenceTab=crypto.randomUUID();
+  let presenceQueue=Promise.resolve(),lastPresence='',lastPresenceAt=0;
+  function sendPresence(override){
+    if(!state.user)return Promise.resolve();
+    const status=override||(state.run&&state.question&&!state.answerReply?.final?'playing':'online');
+    if(!override&&status===lastPresence&&Date.now()-lastPresenceAt<20000)return presenceQueue;
+    lastPresence=status;lastPresenceAt=Date.now();
+    presenceQueue=presenceQueue.catch(()=>{}).then(()=>api({action:'presence',tab:presenceTab,status})).catch(()=>{lastPresenceAt=0;});
+    return presenceQueue;
+  }
+  function presenceDot(p){
+    const status=p.presencia;
+    if(status!=='online'&&status!=='playing')return '';
+    const title=status==='playing'?'En partida':'Connectat';
+    return '<span class="presence-dot '+status+'" role="img" aria-label="'+title+'" title="'+title+'"></span>';
+  }
+  setInterval(()=>{
+    sendPresence();
+    if(state.user&&document.getElementById('list'))ranking(true);
+  },25000);
+  window.addEventListener('pagehide',()=>{sendPresence('offline');});
+  window.addEventListener('pageshow',()=>{lastPresenceAt=0;sendPresence();});
   function activateSession(){
     sess.innerHTML=state.user?'<span>'+escapeHTML(state.user.name||'Jugador')+'</span><button class="btn small" id="logout">Sortir</button>':'';
     document.getElementById('logout')?.addEventListener('click',async()=>{
@@ -52,6 +75,8 @@
       try {
         // Un error desant una partida no ha de deixar bloquejat el botó de sortir.
         // Submitted answers are already saved; keep the run resumable on logout.
+        await sendPresence('offline');
+        lastPresence='';lastPresenceAt=0;
         try{await account.deleteSession({sessionId:'current'});}catch(e){if(e.code!==401)throw e;}
         clearChallenge();
         state.user=null;state.run=null;state.question=null;state.answerReply=null;
@@ -237,7 +262,7 @@
       state.busy=true;document.getElementById('answerButton').disabled=true;
       try{
         const reply=await api({action:'answer',partida:state.run,index:q.index,resposta:inp});
-        cache.remove(draftKey());state.points=reply.puntuacio;state.answerReply=reply;renderFeedback(reply);
+        cache.remove(draftKey());state.points=reply.puntuacio;state.answerReply=reply;sendPresence();renderFeedback(reply);
       }catch(err){
         try{
           const current=await api({action:'resume',mode:state.mode});
@@ -284,9 +309,10 @@
     document.getElementById('again').onclick=pickMode;document.getElementById('viewRanking').onclick=ranking;
     cache.remove(draftKey());state.run=null;state.question=null;
   }
-  async function ranking(){
-    show('<div class="panel"><div class="eyebrow">Classificació pública</div><h1>Rànquing de jugadors</h1><p class="sub">Jugadors ordenats de més punts a menys punts.</p><div id="list"><p>Carregant puntuacions...</p></div><button class="btn" id="backHome">← Tornar</button><div id="feedback" hidden></div></div>');
-    document.getElementById('backHome').onclick=home;
+  async function ranking(refresh=false){
+    refresh=refresh===true;
+    if(!refresh)show('<div class="panel"><div class="eyebrow">Classificació pública</div><h1>Rànquing de jugadors</h1><p class="sub">Jugadors ordenats de més punts a menys punts.</p><p class="presence-legend"><span><i class="presence-dot online" aria-hidden="true"></i> Connectat</span><span><i class="presence-dot playing" aria-hidden="true"></i> En partida</span></p><div id="list"><p>Carregant puntuacions...</p></div><button class="btn" id="backHome">← Tornar</button><div id="feedback" hidden></div></div>');
+    if(!refresh)document.getElementById('backHome').onclick=home;
     try{
       const data=await api({action:'ranking'});
       if(!document.getElementById('list'))return;
@@ -298,15 +324,15 @@
       const isMe=p=>p.id?p.id===state.user?.$id:uniqueName&&p.nom===state.user?.name;
       const medals=['🥇','🥈','🥉'],titles=['Primer','Segon','Tercer'];
       const podium=players.slice(0,3).map((p,i)=>
-        '<article class="podium-card podium-'+i+'"><span class="podium-medal" aria-hidden="true">'+medals[i]+'</span><span class="podium-place">'+titles[i]+'</span><strong class="podium-name">'+escapeHTML(p.nom)+'</strong><span class="podium-points">'+fmt(p.punts)+' <small>punts</small></span></article>'
+        '<article class="podium-card podium-'+i+'"><span class="podium-medal" aria-hidden="true">'+medals[i]+'</span><span class="podium-place">'+titles[i]+'</span><strong class="podium-name">'+escapeHTML(p.nom)+presenceDot(p)+'</strong><span class="podium-points">'+fmt(p.punts)+' <small>punts</small></span></article>'
       ).join('');
       document.getElementById('list').innerHTML=players.length?
         '<div class="rank-podium" aria-label="Podi del rànquing">'+podium+'</div><div class="rank-caption"><span>Classificació · '+players.length+' jugadors'+(players.length===100?' (top 100)':'')+'</span><span>+10 per encert</span></div><table class="ranking ranking-fresh"><thead><tr><th scope="col">Posició</th><th scope="col">Jugador</th><th scope="col">Punts</th></tr></thead><tbody>'+
-        players.map((p,i)=>'<tr'+(isMe(p)?' class="me"':'')+'><td><span class="rank-position">'+(i<3?'<span aria-hidden="true">'+medals[i]+'</span>':'')+ordinal(i+1)+'</span></td><td><span class="rank-name">'+escapeHTML(p.nom)+'</span>'+(isMe(p)?'<span class="rank-you">Tu</span>':'')+'<small class="rank-games">'+fmt(p.partides)+' partides</small></td><td><strong>'+fmt(p.punts)+'</strong></td></tr>').join('')+
+        players.map((p,i)=>'<tr'+(isMe(p)?' class="me"':'')+'><td><span class="rank-position">'+(i<3?'<span aria-hidden="true">'+medals[i]+'</span>':'')+ordinal(i+1)+'</span></td><td><span class="rank-name">'+escapeHTML(p.nom)+presenceDot(p)+'</span>'+(isMe(p)?'<span class="rank-you">Tu</span>':'')+'<small class="rank-games">'+fmt(p.partides)+' partides</small></td><td><strong>'+fmt(p.punts)+'</strong></td></tr>').join('')+
         '</tbody></table><p class="hint rank-footnote">Cada resposta compta. Practica una mica més i puja posicions.</p>':
         '<div class="rank-empty"><span aria-hidden="true">🏆</span><h2>El primer lloc t’espera</h2><p class="sub">Completa una partida i estrena el rànquing.</p></div>';
 
-    }catch(e){msg(errorMessage(e),true);const list=document.getElementById('list');if(list)list.innerHTML='';}
+    }catch(e){if(!refresh){msg(errorMessage(e),true);const list=document.getElementById('list');if(list)list.innerHTML='';}}
   }
   async function bootstrap(){
     try{
