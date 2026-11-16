@@ -13,3 +13,5 @@
 .ranking-fresh td:last-child{font-variant-numeric:tabular-nums;white-space:nowrap}.ranking-fresh tr.me td:first-child{box-shadow:inset 3px 0 #315fce}
 .rank-footnote{margin-bottom:22px}.rank-empty{text-align:center;padding:30px 10px}.rank-empty>span{display:block;font-size:38px;margin-bottom:15px}
 @media(max-width:480px){.rank-podium{gap:6px}.podium-card{padding:14px 6px}.podium-name{font-size:13px}.podium-points{font-size:17px}.podium-medal{font-size:27px}.ranking-fresh th,.ranking-fresh td{padding:12px 6px}.rank-position{gap:3px;font-size:13px}.rank-position>span{font-size:18px}.rank-caption{font-size:11px}}
+
+.presence-dot{display:inline-block;width:9px;height:9px;border-radius:50%;margin-left:7px;vertical-align:middle;flex-shrink:0}.presence-dot.online{background:#16803b}.presence-dot.playing{background:#dc3038}.presence-legend{display:flex;gap:18px;color:#647187;font-size:12px;margin-top:-6px}.presence-legend .presence-dot{margin-left:0;margin-right:3px}
