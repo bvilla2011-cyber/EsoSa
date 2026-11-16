@@ -14,7 +14,16 @@
   function msg(text,bad=false){const box=document.querySelector('#feedback');if(box){box.textContent=text;box.className='message'+(bad?' error':' ok');box.hidden=false;}}
   function activateSession(){
     sess.innerHTML=state.user?'<span>'+escapeHTML(state.user.name||'Jugador')+'</span><button class="btn small" id="logout">Sortir</button>':'';
-    document.getElementById('logout')?.addEventListener('click',async()=>{try{await account.deleteSession({sessionId:'current'})}catch(e){}state.user=null;state.run=null;renderAuth();});
+    document.getElementById('logout')?.addEventListener('click',async()=>{
+      if(state.busy)return;
+      state.busy=true;
+      try{
+        if(state.run) await api({action:'leave',partida:state.run});
+        await account.deleteSession({sessionId:'current'});
+        state.user=null;state.run=null;state.question=null;renderAuth();
+      }catch(e){msg('No s\\'ha pogut desar i sortir: '+errorMessage(e),true);}
+      finally{state.busy=false;}
+    });
   }
   async function api(body){
     const r=await functions.createExecution({functionId:'motor',body:JSON.stringify(body),async:false,method:'POST'});
@@ -79,7 +88,8 @@
     const q=state.question;if(!q)return home();
     const pct=Math.round((q.index-1)/q.total*100);
     const canTest=q.tipus==='test';
-    show('<div class="panel"><div class="bar"><div class="eyebrow">'+escapeHTML(label(state.mode))+' · '+escapeHTML(q.fase)+'</div><strong>'+q.index+' / '+q.total+'</strong></div><div class="progress"><div style="width:'+pct+'%"></div></div><div class="bar"><span class="muted">Punts d\'aquesta partida</span><strong>'+state.points+'</strong></div><div class="question">'+escapeHTML(q.enunciat)+'</div><form id="answerForm" class="stack large-gap">'+(canTest?'<div class="stack">'+q.opcions.map((x,i)=>'<label class="option"><input type="radio" name="answer" value="'+escapeHTML(x)+'" required><span>'+escapeHTML(x)+'</span></label>').join('')+'</div>':q.tipus==='text'?'<label>Text corregit (una frase per línia)<textarea name="answer" required spellcheck="true" placeholder="Reescriu aquí tot el text corregit..."></textarea></label>':'<label>Escriu la resposta<input name="answer" required autocomplete="off" spellcheck="true" placeholder="La teva resposta"></label>')+'<button class="btn primary full" type="submit" id="answerButton">Comprovar resposta</button><div id="feedback" hidden></div></form><p class="hint" style="margin-top:24px">No pots avançar fins que hagis enviat una resposta.</p></div>');
+    show('<div class="panel"><div class="bar"><div class="eyebrow">'+escapeHTML(label(state.mode))+' · '+escapeHTML(q.fase)+'</div><strong>'+q.index+' / '+q.total+'</strong></div><div class="progress"><div style="width:'+pct+'%"></div></div><div class="bar"><span class="muted">Punts d\'aquesta partida</span><strong>'+state.points+'</strong></div><div class="question">'+escapeHTML(q.enunciat)+'</div><form id="answerForm" class="stack large-gap">'+(canTest?'<div class="stack">'+q.opcions.map((x,i)=>'<label class="option"><input type="radio" name="answer" value="'+escapeHTML(x)+'" required><span>'+escapeHTML(x)+'</span></label>').join('')+'</div>':q.tipus==='text'?'<label>Text corregit (una frase per línia)<textarea name="answer" required spellcheck="true" placeholder="Reescriu aquí tot el text corregit..."></textarea></label>':'<label>Escriu la resposta<input name="answer" required autocomplete="off" spellcheck="true" placeholder="La teva resposta"></label>')+'<button class="btn primary full" type="submit" id="answerButton">Comprovar resposta</button><div id="feedback" hidden></div></form><p class="hint" style="margin-top:24px">No pots avançar fins que hagis enviat una resposta.</p><button type="button" class="btn secondary full" id="leaveGame" style="margin-top:12px">SORTIR I DESAR PUNTS</button></div>');
+    document.getElementById('leaveGame').onclick=sortirIGuardar;
     document.getElementById('answerForm').onsubmit=async(e)=>{
       e.preventDefault();if(state.busy)return;
       const inp=String(new FormData(e.currentTarget).get('answer')||'').trim();if(!inp){msg('Introdueix una resposta.',true);return}
@@ -98,7 +108,24 @@
     const sol=String(r.solucio??'');
     next.innerHTML='<div class="result '+(r.correcte?'ok':'bad')+'"><strong>'+(r.correcte?'Resposta correcta: +10 punts':'Resposta incorrecta: −5 punts')+'</strong><div>'+escapeHTML(r.correcte?'Molt bé!':('Solució:\n'+sol)).replace(/\n/g,'<br>')+'</div></div><button class="btn primary full" id="nextQuestion">'+(r.final?'VEURE EL RESULTAT':'PREGUNTA SEGÜENT')+'</button>';
     form.insertAdjacentElement('afterend',next);
+    if(r.final) document.getElementById('leaveGame')?.remove();
     document.getElementById('nextQuestion').onclick=()=>{if(r.final){renderFinish(r.resultat)}else{state.question=r.pregunta;state.answerReply=null;renderQuestion()}};
+  }
+  async function sortirIGuardar(){
+    if(!state.run||state.busy)return;
+    state.busy=true;
+    const button=document.getElementById('leaveGame');
+    if(button){button.disabled=true;button.textContent='DESANT ELS PUNTS...';}
+    try{
+      const resposta=await api({action:'leave',partida:state.run});
+      state.run=null;state.question=null;state.answerReply=null;
+      await home();
+      const result=resposta.resultat;
+      msg('Partida guardada! '+(result.punts>=0?'+':'')+result.punts+' punts. Ara tens '+result.total+' punts acumulats.',false);
+    }catch(e){
+      msg('No s\\'han pogut desar els punts: '+errorMessage(e),true);
+      if(button){button.disabled=false;button.textContent='SORTIR I DESAR PUNTS';}
+    }finally{state.busy=false;}
   }
   function renderFinish(result){
     const good=result.encerts,bad=result.errors;
