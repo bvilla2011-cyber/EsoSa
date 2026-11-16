@@ -12,16 +12,29 @@
   function show(html){el.innerHTML=html;}
   function errorMessage(e){return escapeHTML(e?.message||String(e||'Hi ha hagut un error.'))}
   function msg(text,bad=false){const box=document.querySelector('#feedback');if(box){box.textContent=text;box.className='message'+(bad?' error':' ok');box.hidden=false;}}
+  // L'estat d'autenticació és sempre el d'Appwrite, no un indicador desat localment.
+  const needsMfa = e => e?.type === 'user_more_factors_required' || e?.code === 401 && String(e?.message||'').toLowerCase().includes('more factors');
+  const alreadyActive = e => e?.type === 'user_session_already_exists' || e?.code === 401 && String(e?.message||'').toLowerCase().includes('session already active');
+
   function activateSession(){
     sess.innerHTML=state.user?'<span>'+escapeHTML(state.user.name||'Jugador')+'</span><button class="btn small" id="logout">Sortir</button>':'';
     document.getElementById('logout')?.addEventListener('click',async()=>{
       if(state.busy)return;
       state.busy=true;
-      try{
-        if(state.run) await api({action:'leave',partida:state.run});
+      let saveError='';
+      try {
+        // Un error desant una partida no ha de deixar bloquejat el botó de sortir.
+        if(state.run) {
+          try { await api({action:'leave',partida:state.run}); }
+          catch(e) { saveError='No s\'ha pogut desar la partida: '+(e?.message||'error de xarxa'); }
+        }
         await account.deleteSession({sessionId:'current'});
-        state.user=null;state.run=null;state.question=null;renderAuth();
-      }catch(e){msg('Error en desar i sortir: '+errorMessage(e),true);}
+        state.user=null;state.run=null;state.question=null;state.answerReply=null;
+        state.authMode=null;state.challengeId='';state.tokenUserId='';
+        state.tab='login';
+        renderAuth();
+        if(saveError)msg(saveError,true);
+      }catch(e){msg('No s\'ha pogut tancar la sessió: '+(e?.message||'Error'),true);}
       finally{state.busy=false;}
     });
   }
@@ -32,41 +45,126 @@
     if(data.error)throw Error(data.error);
     return data;
   }
+  async function enviaCodiMfa(){
+    const challenge=await account.createMfaChallenge({factor:'email'});
+    state.authMode='mfa';
+    state.challengeId=challenge.$id;
+    renderOTP();
+  }
+  async function completarInici(){
+    try{
+      const user=await account.get();
+      if(!user.emailVerification){
+        // El primer accés es verifica amb un codi, sense destruir la sessió de contrasenya.
+        const token=await account.createEmailVerificationOTP();
+        state.tokenUserId=token.userId;
+        state.authMode='verify-email';
+        renderOTP();
+        return;
+      }
+      if(!user.mfa){
+        // MFA real: email + contrasenya; no creem ni esborrem sessions artificiosament.
+        await account.updateMFA({mfa:true});
+        await enviaCodiMfa();
+        return;
+      }
+      state.user=user;
+      state.authMode=null;
+      await home();
+    }catch(e){
+      if(needsMfa(e)){await enviaCodiMfa();return;}
+      throw e;
+    }
+  }
+  async function iniciarAmbContrasenya(email,password){
+    state.email=email;
+    try{
+      await account.createEmailPasswordSession({email,password});
+    }catch(e){
+      if(alreadyActive(e)){
+        // Una pestanya antiga pot conservar una sessió (inclosa MFA pendent).
+        try {
+          const user=await account.get();
+          if(user.email.toLowerCase()!==email.toLowerCase())throw e;
+        }catch(inner) {
+          if(needsMfa(inner)){await enviaCodiMfa();return;}
+          throw e;
+        }
+      }else{
+        // Alguns projectes poden exigir MFA immediatament després d'enviar la contrasenya.
+        if(needsMfa(e)){await enviaCodiMfa();return;}
+        throw e;
+      }
+    }
+    await completarInici();
+  }
   function renderAuth(){
     activateSession();if(state.user)return home();
     const registration=state.tab==='register';
-    show('<div class="panel narrow"><div class="eyebrow">Benvingut al teu entrenament</div><h1>Aprèn català. Suma punts.</h1><p class="sub">Entra amb el teu compte per conservar la teva puntuació i competir al rànquing.</p><div class="tabs"><button id="toLogin" class="'+(!registration?'active':'')+'">Iniciar sessió</button><button id="toRegister" class="'+(registration?'active':'')+'">Registrar-se</button></div><form id="authForm" class="stack">'+(registration?'<label>Nom per al rànquing<input name="name" maxlength="60" required autocomplete="nickname" placeholder="El teu nom de jugador"></label>':'')+'<label>Correu electrònic<input name="email" type="email" required autocomplete="email" placeholder="correu@exemple.cat"></label><label>Contrasenya<input name="password" type="password" required minlength="8" autocomplete="'+(registration?'new-password':'current-password')+'" placeholder="8 caràcters com a mínim"></label><button id="submitAuth" class="btn primary full" type="submit">'+(registration?'Crear el meu compte':'Continuar')+'</button><div id="feedback" hidden></div><p class="hint">'+(registration?'Després del registre, inicia sessió. El codi per correu es demana en entrar.':'Quan introdueixis una contrasenya correcta, t\'enviarem un codi al correu. El navegador conservarà la sessió després de verificar-la.')+'</p></form></div>');
+    show('<div class="panel narrow"><div class="eyebrow">Benvingut al teu entrenament</div><h1>Aprèn català. Suma punts.</h1><p class="sub">Entra amb el teu compte per conservar la teva puntuació i competir al rànquing.</p><div class="tabs"><button id="toLogin" class="'+(!registration?'active':'')+'">Iniciar sessió</button><button id="toRegister" class="'+(registration?'active':'')+'">Registrar-se</button></div><form id="authForm" class="stack">'+(registration?'<label>Nom per al rànquing<input name="name" maxlength="60" required autocomplete="nickname" placeholder="El teu nom de jugador"></label>':'')+'<label>Correu electrònic<input name="email" type="email" required autocomplete="email" placeholder="correu@exemple.cat"></label><label>Contrasenya<input name="password" type="password" required minlength="8" autocomplete="'+(registration?'new-password':'current-password')+'" placeholder="8 caràcters com a mínim"></label><button id="submitAuth" class="btn primary full" type="submit">'+(registration?'Crear el meu compte':'Continuar')+'</button><div id="feedback" hidden></div><p class="hint">'+(registration?'Després del registre, inicia sessió. El primer codi confirmarà el teu correu.':'El codi per correu es verifica dins la sessió, sense eliminar-la. Aquest dispositiu conservarà la sessió fins que premis «Sortir».')+'</p></form></div>');
     document.getElementById('toLogin').onclick=()=>{state.tab='login';renderAuth()};
     document.getElementById('toRegister').onclick=()=>{state.tab='register';renderAuth()};
     document.getElementById('authForm').onsubmit=async(e)=>{
-      e.preventDefault();if(state.busy)return;state.busy=true;const button=document.getElementById('submitAuth');button.disabled=true;
-      const data=new FormData(e.currentTarget),email=String(data.get('email')).trim(),password=String(data.get('password'));
+      e.preventDefault();if(state.busy)return;
+      state.busy=true;
+      const button=document.getElementById('submitAuth');
+      button.disabled=true;
+      const formData=new FormData(e.currentTarget);
+      const email=String(formData.get('email')).trim().toLowerCase(),password=String(formData.get('password'));
       try{
         if(registration){
-          const name=String(data.get('name')||'').trim();
+          const name=String(formData.get('name')||'').trim();
           if(name.length<2)throw Error('Escriu un nom de com a mínim 2 caràcters.');
           await account.create({userId:ID.unique(),email,password,name});
-          state.tab='login';renderAuth();msg('Compte creat. Inicia sessió per rebre el codi al correu.');
+          state.tab='login';
+          renderAuth();
+          msg('Compte creat. Inicia sessió amb la mateixa contrasenya.',false);
         }else{
-          await account.createEmailPasswordSession({email,password});
-          // Després de validar la contrasenya, no donem accés fins a verificar el codi.
-          await account.deleteSession({sessionId:'current'});
-          const token=await account.createEmailToken({userId:ID.unique(),email});
-          state.email=email;state.tokenUserId=token.userId;renderOTP();
+          await iniciarAmbContrasenya(email,password);
         }
-      }catch(err){msg(errorMessage(err),true);button.disabled=false;}
-      finally{state.busy=false;}
+      }catch(err){
+        msg(errorMessage(err),true);
+        if(button.isConnected)button.disabled=false;
+      }finally{state.busy=false;}
     };
   }
   function renderOTP(){
-    show('<div class="panel narrow"><div class="eyebrow">Verificació d\'inici de sessió</div><h1>Revisa el correu</h1><p>Hem enviat un codi d\'un sol ús a <strong>'+escapeHTML(state.email)+'</strong>.</p><form id="codeForm" class="stack"><label>Codi de verificació<input name="otp" required autocomplete="one-time-code" inputmode="numeric" maxlength="16" placeholder="Introdueix el codi"></label><button class="btn primary full" id="codeButton">Verificar i entrar</button><div id="feedback" hidden></div></form><p class="hint">El dispositiu conservarà la sessió mentre sigui vàlida. No comparteixis mai el codi.</p><button class="btn link" id="backLogin">Tornar a l\'inici</button></div>');
-    document.getElementById('backLogin').onclick=renderAuth;
+    const isVerify=state.authMode==='verify-email';
+    show('<div class="panel narrow"><div class="eyebrow">'+(isVerify?'Verificació del correu':'Segon factor de seguretat')+'</div><h1>Revisa el correu</h1><p>Hem enviat un codi a <strong>'+escapeHTML(state.email||'el teu correu')+'</strong>.</p><form id="codeForm" class="stack"><label>Codi de sis xifres<input name="otp" type="text" inputmode="numeric" pattern="[0-9]{6}" required autocomplete="one-time-code" maxlength="6" placeholder="000000"></label><button class="btn primary full" id="codeButton">Verificar i entrar</button><div id="feedback" hidden></div></form><div class="stack" style="margin-top:18px"><button class="btn secondary full" id="resendCode" type="button">Reenviar el codi</button><button class="btn link" id="backLogin" type="button">Tornar a iniciar sessió</button><p class="hint">No comparteixis el codi amb ningú. La sessió quedarà recordada fins que tanquis sessió expressament.</p></div></div>');
     document.getElementById('codeForm').onsubmit=async(e)=>{
-      e.preventDefault();const btn=document.getElementById('codeButton');btn.disabled=true;
+      e.preventDefault();if(state.busy)return;state.busy=true;
+      const btn=document.getElementById('codeButton');btn.disabled=true;
       try{
-        await account.createSession({userId:state.tokenUserId,secret:String(new FormData(e.currentTarget).get('otp')).trim()});
-        state.user=await account.get();activateSession();await home();
-      }catch(err){msg(errorMessage(err),true);btn.disabled=false;}
+        const otp=String(new FormData(e.currentTarget).get('otp')).trim();
+        if(state.authMode==='mfa'){
+          await account.updateMfaChallenge({challengeId:state.challengeId,otp});
+          state.user=await account.get();state.authMode=null;
+          await home();
+        }else if(state.authMode==='verify-email'){
+          await account.updateEmailVerificationOTP({userId:state.tokenUserId,secret:otp});
+          await completarInici();
+        }else throw Error('La verificació ha caducat. Torna a iniciar sessió.');
+      }catch(err){msg(errorMessage(err),true);if(btn.isConnected)btn.disabled=false;}
+      finally{state.busy=false;}
+    };
+    document.getElementById('resendCode').onclick=async()=>{
+      if(state.busy)return;state.busy=true;
+      const btn=document.getElementById('resendCode');btn.disabled=true;
+      try {
+        if(state.authMode==='mfa')await enviaCodiMfa();
+        else if(state.authMode==='verify-email'){
+          const token=await account.createEmailVerificationOTP();
+          state.tokenUserId=token.userId;renderOTP();
+        }
+        msg('T\'hem enviat un altre codi al correu.');
+      }catch(err){msg(errorMessage(err),true);if(btn.isConnected)btn.disabled=false;}
+      finally{state.busy=false;}
+    };
+    document.getElementById('backLogin').onclick=async()=>{
+      if(state.busy)return;state.busy=true;
+      try{await account.deleteSession({sessionId:'current'});}catch(e){/* sessió parcial o ja caducada */}
+      state.authMode=null;state.challengeId='';state.tokenUserId='';state.user=null;
+      state.tab='login';state.busy=false;renderAuth();
     };
   }
   async function home(){
@@ -142,7 +240,7 @@
     }catch(e){msg(errorMessage(e),true);document.getElementById('list').innerHTML='';}
   }
   async function bootstrap(){
-    try{state.user=await account.get();await home();}catch{renderAuth();}
+    try{state.user=await account.get();await home();}catch(e){if(needsMfa(e)){try{await enviaCodiMfa();return;}catch(err){}}state.user=null;renderAuth();}
   }
   bootstrap();
 })();
