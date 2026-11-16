@@ -12,7 +12,7 @@ function fabrica(mode){
    const tipus=mode==='lexic'?'Lèxic':'Dites';
    const ordre=barreja(data);
    const test=ordre.map(([mot,def])=>{
-      const errors=barreja(data.filter(x=>x[0]!==mot).map(x=>x[1])).slice(0,2);
+      const errors=barreja([...new Set(data.filter(x=>x[0]!==mot && x[1]!==def).map(x=>x[1]))]).slice(0,2);
       return {tipus:'test',fase:'TEST',enunciat:'Què vol dir «'+mot+'»?',opcions:barreja([def,...errors]),correcta:def};
    });
    const escriu=barreja(data).slice(0,mode==='lexic'?15:10).map(([mot,def])=>({
@@ -134,7 +134,7 @@ export default async ({req,res,error})=>{
     if(final){
       const p=await perfil();
       const np=await write(PERFILS,userId,{nom:p.nom,punts:p.punts+guany,partides:p.partides+1,encerts:p.encerts+correctes,errors:p.errors+fallades});
-      return res.json({correcte:ok,solucio:q.correcta,puntuacio:guany,final:true,resultat:{nota:Math.round(correctes/qs.length*100)/10,encerts:correctes,errors:fallades,punts:guany,total:np.punts,dominat:np.punts>=10000}});
+      return res.json({correcte:ok,solucio:q.correcta||q.respostes?.join('\n'),puntuacio:guany,final:true,resultat:{nota:Math.round(correctes/qs.length*100)/10,encerts:correctes,errors:fallades,punts:guany,total:np.punts,dominat:np.punts>=10000}});
     }
     return res.json({correcte:ok,solucio:q.correcta,puntuacio:guany,final:false,pregunta:pregVisible(qs[pos+1],pos+1,qs.length)});
   }
