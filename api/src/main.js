@@ -1,4 +1,5 @@
 import { Client, TablesDB, Users, ID, Query } from 'node-appwrite';
+import { opcionsDificils } from '../../src/distractors.js';
 import { createHash } from 'node:crypto';
 import { LEXIC, DITES, CATANYOL } from '../../src/banc.js';
 
@@ -13,20 +14,7 @@ function fabricaBase(mode,complet=false){
    const tipus=mode==='lexic'?'Lèxic':'Dites';
    const ordre=barreja(data);
    const test=ordre.map(([mot,def])=>{
-      // Evitem opcions sinònimes que puguin ser totes correctes.
-      const iguals=[
-        ["n'estic tip","n'estic fart"],
-        ["m'és igual","tant me fa","tant se me'n dóna"],
-        ["tant se val","això rai!","no hi fa res"],
-        ["què hi farem!","què vols fer-hi!","no hi ha res a fer"],
-        ["remugar","rondinar","renegar"],
-        ["desmanegar-se","desmuntar-se"],
-        ["caure","estimbar-se","ensorrar-se","enfonsar"],
-        ["plegar","enllestir","exhaurir-se"]
-      ];
-      const massaSemblant=altra=>iguals.some(g=>g.includes(mot)&&g.includes(altra));
-      const errors=barreja([...new Set(data.filter(x=>x[0]!==mot && x[1]!==def && !massaSemblant(x[0])).map(x=>x[1]))]).slice(0,2);
-      return {tipus:'test',fase:'TEST',enunciat:'Què vol dir «'+mot+'»?',opcions:barreja([def,...errors]),correcta:def};
+      return {tipus:'test',fase:'TEST',enunciat:'Què vol dir «'+mot+'»?',opcions:barreja(opcionsDificils(mode,mot,def)),correcta:def};
    });
    const escriu=barreja(data).slice(0,complet?data.length:mode==='lexic'?15:10).map(([mot,def])=>({
       tipus:'escriure',fase:'ESCRIURE',enunciat:'Quina paraula o expressió correspon a la definició?\n'+def,correcta:mot
@@ -230,6 +218,15 @@ export default async ({req,res,error})=>{
     const run=(all.rows||all.documents||[]).find(x=>!body.mode||x.mode===body.mode);
     if(!run)return res.json({partida:null});
     const qs=JSON.parse(run.preguntes);
+    let actualitzada=false;
+    for(let i=run.posicio;i<qs.length;i++){
+      const q=qs[i],mode=q.apartat||run.mode;
+      if(q.tipus!=='test'||q.opcions?.length===4)continue;
+      const mot=/^Què vol dir «(.+)»\?$/.exec(q.enunciat)?.[1];
+      if(!mot||!['lexic','dites'].includes(mode))continue;
+      q.opcions=barreja(opcionsDificils(mode,mot,q.correcta));actualitzada=true;
+    }
+    if(actualitzada)await write(PARTIDES,run.$id,{preguntes:JSON.stringify(qs)});
     return res.json({partida:run.$id,mode:run.mode,pregunta:pregVisible(qs[run.posicio],run.posicio,qs.length),puntuacio:run.guany});
   }
   if(action==='leave'){
