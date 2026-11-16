@@ -8,8 +8,9 @@
   const account=new Account(sdk),functions=new Functions(sdk);
   const state={user:null,tab:'login',email:'',tokenUserId:'',run:null,question:null,answerReply:null,points:0,mode:'',busy:false};
   const escapeHTML=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
-  const label=mode=>({lexic:'Lèxic',dites:'Dites',catanyol:'Catanyol'})[mode]||'Practicar';
-  function show(html){el.innerHTML=html;sendPresence();}
+  const label=mode=>({lexic:'Lèxic',dites:'Dites',catanyol:'Catanyol',mix:'MIX'})[mode]||'Practicar';
+  let viewVersion=0,autoTimers=[];
+  function show(html){viewVersion++;autoTimers.forEach(clearTimeout);autoTimers=[];el.innerHTML=html;sendPresence();}
   function errorMessage(e){
     if(e?.code===429)return 'Massa intents. Espera uns minuts abans de tornar-ho a provar.';
     if(e?.type==='user_invalid_credentials')return 'Correu o contrasenya incorrectes.';
@@ -224,9 +225,10 @@
     };
   }
   async function home(){
-    activateSession();show('<div class="panel"><div class="eyebrow">Tauler personal</div><h1>Hola, '+escapeHTML(state.user?.name||'jugador')+'</h1><p class="sub">Aprèn les paraules dels apunts i puja posicions al rànquing.</p><div id="stats" class="score-row"><div class="scorebox"><strong>...</strong><small>Els teus punts</small></div></div><div class="stack"><button class="btn primary full" id="practice">PRACTICAR</button><button class="btn secondary full" id="ranking">RÀNQUING</button></div><p class="hint" style="margin-top:22px">+10 punts per resposta correcta · −5 punts per error · 10.000 punts: EXAMEN DOMINADO</p><div id="feedback" hidden></div></div>');
+    activateSession();show('<div class="panel"><div class="eyebrow">Tauler personal</div><h1>Hola, '+escapeHTML(state.user?.name||'jugador')+'</h1><p class="sub">Aprèn les paraules dels apunts i puja posicions al rànquing.</p><div id="stats" class="score-row"><div class="scorebox"><strong>...</strong><small>Els teus punts</small></div></div><div class="stack"><button class="btn primary full" id="practice">PRACTICAR</button><button class="btn secondary full" id="ranking">RÀNQUING</button></div><button class="btn small history-entry" id="historyButton">Historial i domini</button><p class="hint" style="margin-top:22px">+10 punts per resposta correcta · −5 punts per error · 10.000 punts: EXAMEN DOMINADO</p><div id="feedback" hidden></div></div>');
     document.getElementById('practice').onclick=pickMode;
     document.getElementById('ranking').onclick=ranking;
+    document.getElementById('historyButton').onclick=historyView;
     try{
       const p=await api({action:'me'});
       if(!document.getElementById('stats'))return;
@@ -235,57 +237,85 @@
     }catch(err){msg(errorMessage(err),true);}
   }
   function pickMode(){
-    show('<div class="panel"><div class="eyebrow">Pràctica</div><h1>Què vols estudiar?</h1><p class="sub">Si tens una partida pendent, es reprendrà automàticament. Cada resposta enviada queda desada.</p><div class="grid2"><section class="mode"><h3>LÈXIC</h3><p>Significats de totes les paraules dels lèxics 37–40, preguntes tipus test, escriptura i buits.</p><button class="btn primary" data-mode="lexic">JUGAR</button></section><section class="mode"><h3>DITES</h3><p>Significats, expressions equivalents i correcció de dites utilitzades amb un sentit inadequat.</p><button class="btn primary" data-mode="dites">JUGAR</button></section><section class="mode"><h3>CATANYOL</h3><p>Textos formats amb exemples dels apunts. Detecta i corregeix les construccions inadequades.</p><button class="btn primary" data-mode="catanyol">JUGAR</button></section><section class="mode"><h3>PUNTUACIÓ</h3><p>+10 encert · −5 error. La puntuació de la partida es desa al final.</p></section></div><div id="feedback" hidden></div><p style="margin-top:24px"><button class="btn" id="backHome">← Tornar</button></p></div>');
+    show('<div class="panel"><div class="eyebrow">Pràctica</div><h1>Què vols estudiar?</h1><p class="sub">Si tens una partida pendent, es reprendrà automàticament. Cada resposta enviada queda desada.</p><div class="grid2"><section class="mode"><h3>LÈXIC</h3><p>Significats de totes les paraules dels lèxics 37–40, preguntes tipus test, escriptura i buits.</p><button class="btn primary" data-mode="lexic">JUGAR</button></section><section class="mode"><h3>DITES</h3><p>Significats, expressions equivalents i correcció de dites utilitzades amb un sentit inadequat.</p><button class="btn primary" data-mode="dites">JUGAR</button></section><section class="mode"><h3>CATANYOL</h3><p>Textos formats amb exemples dels apunts. Detecta i corregeix les construccions inadequades.</p><button class="btn primary" data-mode="catanyol">JUGAR</button></section><section class="mode"><h3>MIX</h3><p>Lèxic, dites i catanyol en una mateixa partida, amb les preguntes barrejades.</p><button class="btn primary" data-mode="mix">JUGAR</button></section></div><div id="feedback" hidden></div><p style="margin-top:24px"><button class="btn" id="backHome">← Tornar</button></p></div>');
     document.getElementById('backHome').onclick=home;
     document.querySelectorAll('[data-mode]').forEach(btn=>btn.onclick=async()=>{if(state.busy)return;state.busy=true;btn.disabled=true;try{await openRun(btn.dataset.mode);}catch(err){msg(errorMessage(err),true);btn.disabled=false;}finally{state.busy=false;}});
   }
+
   function renderQuestion(){
     const q=state.question;if(!q)return home();
-    const pct=Math.round((q.index-1)/q.total*100);
-    const canTest=q.tipus==='test';
-    show('<div class="panel"><div class="bar"><div class="eyebrow">'+escapeHTML(label(state.mode))+' · '+escapeHTML(q.fase)+'</div><strong>'+q.index+' / '+q.total+'</strong></div><div class="progress"><div style="width:'+pct+'%"></div></div><div class="bar"><span class="muted">Punts d\'aquesta partida</span><strong>'+state.points+'</strong></div><div class="question">'+escapeHTML(q.enunciat)+'</div><form id="answerForm" class="stack large-gap">'+(canTest?'<div class="stack">'+q.opcions.map((x,i)=>'<label class="option"><input type="radio" name="answer" value="'+escapeHTML(x)+'" required><span>'+escapeHTML(x)+'</span></label>').join('')+'</div>':q.tipus==='text'?'<label>Text corregit (una frase per línia)<textarea name="answer" required spellcheck="true" placeholder="Reescriu aquí tot el text corregit..."></textarea></label>':'<label>Escriu la resposta<input name="answer" required autocomplete="off" spellcheck="true" placeholder="La teva resposta"></label>')+'<button class="btn primary full" type="submit" id="answerButton">Comprovar resposta</button><div id="feedback" hidden></div></form><p class="hint" style="margin-top:24px">No pots avançar fins que hagis enviat una resposta.</p><button type="button" class="btn secondary full" id="leaveGame" style="margin-top:12px">SORTIR I DESAR PUNTS</button></div>');
-
+    const pct=Math.round((q.index-1)/q.total*100),canTest=q.tipus==='test';
+    const section=state.mode==='mix'?'MIX · '+label(q.apartat):label(state.mode);
+    show('<div class="panel"><div class="bar"><div class="eyebrow">'+escapeHTML(section)+' · '+escapeHTML(q.fase)+'</div><strong>'+q.index+' / '+q.total+'</strong></div><div class="progress"><div style="width:'+pct+'%"></div></div><div class="bar"><span class="muted">Punts d’aquesta partida</span><strong id="livePoints">'+state.points+'</strong></div><div class="question">'+escapeHTML(q.enunciat)+'</div><form id="answerForm" class="stack large-gap">'+(canTest?'<div class="stack">'+q.opcions.map(x=>'<label class="option"><input type="radio" name="answer" value="'+escapeHTML(x)+'" required><span>'+escapeHTML(x)+'</span></label>').join('')+'</div>':q.tipus==='text'?'<label>Text corregit (una frase per línia)<textarea name="answer" required spellcheck="true" placeholder="Reescriu aquí tot el text corregit..."></textarea></label>':'<label>Escriu la resposta<input name="answer" required autocomplete="off" spellcheck="true" placeholder="La teva resposta"></label>')+'<button class="btn primary full" type="submit" id="answerButton"'+(canTest?' hidden':'')+'>Comprovar resposta</button><div id="feedback" hidden role="status"></div></form><p class="hint" style="margin-top:24px">'+(canTest?'Tria una opció. Es corregirà i avançarà automàticament.':'Envia la resposta per veure la correcció.')+'</p><button type="button" class="btn secondary full" id="leaveGame" style="margin-top:12px">SORTIR I DESAR PUNTS</button></div>');
+    const version=viewVersion,run=state.run;
     const form=document.getElementById('answerForm'),saved=cache.get(draftKey());
-    if(saved?.index===q.index){
-      if(canTest)form.querySelectorAll('[name=answer]').forEach(i=>{i.checked=i.value===saved.value});
-      else form.elements.answer.value=String(saved.value||'');
-    }
+    if(!canTest&&saved?.index===q.index)form.elements.answer.value=String(saved.value||'');
     form.addEventListener('input',()=>cache.set(draftKey(),{index:q.index,value:String(new FormData(form).get('answer')||'')}));
     const pause=document.createElement('button');pause.type='button';pause.className='btn full';
     pause.textContent='PAUSAR I CONTINUAR MÉS TARD';
     pause.onclick=()=>{if(state.busy)return;state.run=null;state.question=null;state.answerReply=null;home();};
     document.getElementById('leaveGame').before(pause);
     document.getElementById('leaveGame').onclick=sortirIGuardar;
-    document.getElementById('answerForm').onsubmit=async(e)=>{
-      e.preventDefault();if(state.busy)return;
-      const inp=String(new FormData(e.currentTarget).get('answer')||'').trim();if(!inp){msg('Introdueix una resposta.',true);return}
-      state.busy=true;document.getElementById('answerButton').disabled=true;
+    form.onsubmit=async(e)=>{
+      e.preventDefault();if(state.busy||state.answerReply)return;
+      const inp=String(new FormData(form).get('answer')||'').trim();if(!inp){msg('Introdueix una resposta.',true);return;}
+      state.busy=true;
+      form.querySelectorAll('input,textarea,button').forEach(n=>n.disabled=true);
+      if(canTest)msg('Desant la resposta…');
       try{
-        const reply=await api({action:'answer',partida:state.run,index:q.index,resposta:inp});
-        cache.remove(draftKey());state.points=reply.puntuacio;state.answerReply=reply;sendPresence();renderFeedback(reply);
+        const reply=await api({action:'answer',partida:run,index:q.index,resposta:inp});
+        if(viewVersion!==version||state.run!==run)return;
+        cache.remove(draftKey());state.points=reply.puntuacio;state.answerReply=reply;sendPresence();
+        document.getElementById('livePoints').textContent=state.points;
+        if(canTest)renderTestFeedback(reply,inp,version);else renderFeedback(reply);
       }catch(err){
+        if(viewVersion!==version||state.run!==run)return;
         try{
           const current=await api({action:'resume',mode:state.mode});
-          if(current.partida===state.run&&current.pregunta?.index>q.index){
+          if(viewVersion!==version||state.run!==run)return;
+          if(current.partida===run&&current.pregunta?.index>q.index){
             cache.remove(draftKey());state.question=current.pregunta;state.points=current.puntuacio;renderQuestion();
             msg('La resposta ja estava desada. Hem recuperat la pregunta actual.');return;
           }
           if(!current.partida){state.run=null;await home();msg('La partida ja està desada.');return;}
         }catch{}
-        msg(errorMessage(err),true);const button=document.getElementById('answerButton');if(button)button.disabled=false;
-      }
-      finally{state.busy=false;}
+        if(viewVersion!==version)return;
+        msg(errorMessage(err),true);form.querySelectorAll('input,textarea,button').forEach(n=>n.disabled=false);
+        const button=document.getElementById('answerButton');button.hidden=false;button.textContent='Tornar a enviar';
+      }finally{state.busy=false;}
     };
+    if(canTest)form.addEventListener('change',e=>{if(e.target.name==='answer'&&!state.busy&&!state.answerReply)form.requestSubmit();});
+  }
+  function advanceAnswer(r){
+    if(r.final){renderFinish(r.resultat);}
+    else{state.question=r.pregunta;state.answerReply=null;renderQuestion();}
+  }
+  function renderTestFeedback(r,selected,version){
+    const options=[...document.querySelectorAll('#answerForm .option')];
+    const chosen=options.find(n=>n.querySelector('input').value===selected);
+    const correct=options.find(n=>n.querySelector('input').value===r.solucio);
+    chosen?.classList.add(r.correcte?'answer-good':'answer-bad');
+    msg(r.correcte?'Correcte! +10 punts':'Incorrecte. −5 punts',!r.correcte);
+    if(!r.correcte){
+      autoTimers.push(setTimeout(()=>{
+        if(viewVersion!==version)return;
+        // Requested presentation: the solution is red too, with an explicit label.
+        correct?.classList.add('answer-solution');
+        if(correct){const badge=document.createElement('small');badge.className='answer-label';badge.textContent='Resposta correcta';correct.append(badge);}
+        msg('Resposta correcta: '+r.solucio,true);
+      },500));
+    }
+    if(r.final)document.getElementById('leaveGame')?.remove();
+    autoTimers.push(setTimeout(()=>{if(viewVersion===version)advanceAnswer(r);},2000));
   }
   function renderFeedback(r){
     const form=document.getElementById('answerForm');if(!form)return;
     form.querySelectorAll('input,textarea,button').forEach(e=>e.disabled=true);
     const next=document.createElement('section');next.className='stack';
-    const sol=String(r.solucio??'');
-    next.innerHTML='<div class="result '+(r.correcte?'ok':'bad')+'"><strong>'+(r.correcte?'Resposta correcta: +10 punts':'Resposta incorrecta: −5 punts')+'</strong><div>'+escapeHTML(r.correcte?'Molt bé!':('Solució:\n'+sol)).replace(/\n/g,'<br>')+'</div></div><button class="btn primary full" id="nextQuestion">'+(r.final?'VEURE EL RESULTAT':'PREGUNTA SEGÜENT')+'</button>';
+    next.innerHTML='<div class="result '+(r.correcte?'ok':'bad')+'"><strong>'+(r.correcte?'Resposta correcta: +10 punts':'Resposta incorrecta: −5 punts')+'</strong><div class="preserve-lines">'+escapeHTML(r.correcte?'Molt bé!':('Solució: '+String(r.solucio??'')))+'</div></div><button class="btn primary full" id="nextQuestion">'+(r.final?'VEURE EL RESULTAT':'PREGUNTA SEGÜENT')+'</button>';
     form.insertAdjacentElement('afterend',next);
-    if(r.final) document.getElementById('leaveGame')?.remove();
-    document.getElementById('nextQuestion').onclick=()=>{if(r.final){renderFinish(r.resultat)}else{state.question=r.pregunta;state.answerReply=null;renderQuestion()}};
+    if(r.final)document.getElementById('leaveGame')?.remove();
+    document.getElementById('nextQuestion').onclick=()=>advanceAnswer(r);
   }
   async function sortirIGuardar(){
     if(!state.run||state.busy)return;
@@ -308,6 +338,56 @@
     show('<div class="panel narrow center"><div class="eyebrow">Partida completada · '+escapeHTML(label(state.mode))+'</div>'+(result.dominat?'<div class="banner">EXAMEN DOMINADO</div>':'')+'<h1>Resultats de la partida</h1><p class="sub">La nota i els punts s\'han desat al teu perfil.</p><div class="score-row" style="justify-content:center"><div class="scorebox"><strong>'+result.nota+' / 10</strong><small>Nota</small></div><div class="scorebox"><strong>'+result.punts+'</strong><small>Punts d\'aquesta partida</small></div><div class="scorebox"><strong>'+result.total+'</strong><small>Punts totals</small></div></div><div class="dues"><p><strong>'+good+'</strong> encerts · <strong>'+bad+'</strong> errors</p></div><div class="stack" style="margin-top:22px"><button class="btn primary full" id="again">Tornar a practicar</button><button class="btn secondary full" id="viewRanking">Veure el rànquing</button></div></div>');
     document.getElementById('again').onclick=pickMode;document.getElementById('viewRanking').onclick=ranking;
     cache.remove(draftKey());state.run=null;state.question=null;
+  }
+
+  const displayDate=value=>new Date(value).toLocaleString('ca-ES',{dateStyle:'short',timeStyle:'short'});
+  async function historyView(){
+    show('<div class="panel"><div class="eyebrow">El teu progrés</div><h1>Historial i domini</h1><p class="sub">Revisa les partides i descobreix què et falta practicar.</p><div id="mastery" class="mastery-grid"><p class="hint">Calculant el domini…</p></div><p class="hint">Domini = preguntes amb l’última resposta correcta ÷ totes les preguntes de l’apartat × 100. Les no practicades no sumen. Repetir una pregunta no la compta dues vegades. Les respostes anteriors a aquesta actualització no es poden reconstruir.</p><h2 class="history-heading">Les teves partides</h2><div id="historyList"><p class="hint">Carregant…</p></div><button class="btn small" id="moreHistory" hidden>Carregar-ne més</button><div id="feedback" hidden></div><button class="btn history-back" id="historyHome">← Tornar al menú</button></div>');
+    const version=viewVersion;
+    document.getElementById('historyHome').onclick=home;
+    let cursor=null,loading=false;
+    const loadPage=async()=>{
+      if(loading)return;loading=true;
+      const button=document.getElementById('moreHistory');button.disabled=true;
+      try{
+        const data=await api({action:'history',cursor});
+        if(viewVersion!==version)return;
+        const list=document.getElementById('historyList');
+        if(!cursor)list.innerHTML='';
+        data.partides.forEach(p=>{
+          const item=document.createElement('button');item.className='history-row';item.type='button';
+          const status=!p.acabat?'En curs':p.respostes<p.total?'Desada parcialment':'Completada';
+          item.innerHTML='<span><strong>'+escapeHTML(label(p.mode))+'</strong><small>'+escapeHTML(displayDate(p.data))+' · '+status+'</small></span><span class="history-row-score"><strong>'+p.encerts+' / '+p.total+' encerts</strong><small>'+(p.punts>=0?'+':'')+p.punts+' punts · Veure detalls →</small></span>';
+          item.onclick=()=>historyDetail(p.id);list.append(item);
+        });
+        if(!list.children.length)list.innerHTML='<p class="sub">Encara no tens partides. Comença a practicar!</p>';
+        cursor=data.cursor;button.hidden=!cursor;
+      }catch(e){if(viewVersion===version){msg(errorMessage(e),true);button.hidden=false;button.textContent='Tornar a provar';}}
+      finally{loading=false;button.disabled=false;}
+    };
+    document.getElementById('moreHistory').onclick=loadPage;
+    const mastery=async()=>{
+      try{
+        const data=await api({action:'mastery'});
+        if(viewVersion!==version)return;
+        document.getElementById('mastery').innerHTML=data.apartats.map(a=>'<section class="mastery-card"><div class="bar"><strong>'+escapeHTML(label(a.mode))+'</strong><strong class="mastery-value">'+a.percentatge.toLocaleString('ca-ES')+'%</strong></div><div class="progress" role="progressbar" aria-label="'+escapeHTML(label(a.mode))+'" aria-valuenow="'+a.percentatge+'" aria-valuemin="0" aria-valuemax="100"><div style="width:'+a.percentatge+'%"></div></div><small>'+a.correctes+' de '+a.total+' dominades · '+a.practicades+' practicades</small></section>').join('');
+      }catch(e){if(viewVersion===version)document.getElementById('mastery').textContent='No hem pogut calcular el domini. Torna a obrir l’historial.';}
+    };
+    await Promise.all([loadPage(),mastery()]);
+  }
+  async function historyDetail(id){
+    show('<div class="panel"><button class="btn small" id="backHistory">← Historial</button><div id="historyDetail"><p class="sub history-back">Carregant la partida…</p></div><div id="feedback" hidden></div></div>');
+    document.getElementById('backHistory').onclick=historyView;
+    const version=viewVersion;
+    try{
+      const p=await api({action:'historyDetail',partida:id});
+      if(viewVersion!==version)return;
+      const section=document.getElementById('historyDetail');
+      section.innerHTML='<div class="eyebrow history-back">'+escapeHTML(displayDate(p.data))+'</div><h1>'+escapeHTML(label(p.mode))+'</h1><p class="sub">'+p.encerts+' encerts · '+p.errors+' errors · '+p.respostes+' / '+p.total+' respostes · '+p.punts+' punts</p>'+p.preguntes.map(q=>{
+        const status=q.estat==='antiga'?'Resposta antiga no desada':q.estat==='pendent'?'Sense respondre':q.encert?'Correcta':'Incorrecta';
+        return '<details class="history-question"><summary><span>'+q.index+'. '+escapeHTML(label(q.apartat))+' · '+escapeHTML(q.fase)+'</span><span class="history-status '+(q.encert===true?'is-good':q.encert===false?'is-bad':'')+'">'+status+'</span></summary><div class="history-answer"><p class="preserve-lines"><strong>'+escapeHTML(q.enunciat)+'</strong></p><p class="preserve-lines"><span class="muted">La teva resposta:</span> '+escapeHTML(q.resposta??(q.estat==='antiga'?'No es guardava en aquesta versió.':'Encara no has respost.'))+'</p>'+(q.solucio!==null?'<p class="preserve-lines"><span class="muted">Resposta correcta:</span> '+escapeHTML(q.solucio)+'</p>':'')+'</div></details>';
+      }).join('');
+    }catch(e){if(viewVersion===version)msg(errorMessage(e),true);}
   }
   async function ranking(refresh=false){
     refresh=refresh===true;
