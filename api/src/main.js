@@ -100,6 +100,39 @@ export default async ({req,res,error})=>{
     try{return await read(PERFILS,userId);}
     catch(e){if(e.code!==404)throw e;try{return await tables.createRow({databaseId:DB,tableId:PERFILS,rowId:userId,data:inicial()});}catch(x){if(x.code===409)return read(PERFILS,userId);throw x;}}
   };
+  // Desa una partida sencera o interrompuda en una única transacció atòmica.
+  // Això evita sumar els mateixos punts dos cops quan l'usuari prem sortir repetidament.
+  const tancar=async (original,patch={})=>{
+    for(let intent=0;intent<3;intent++){
+      const run=intent===0?original:await read(PARTIDES,original.$id);
+      if(run.usuari!==userId)throw Object.assign(new Error('Partida no autoritzada'),{code:403});
+      const tot=JSON.parse(run.preguntes).length;
+      if(run.acabat){
+        const p=await perfil();
+        return {jaDesada:true,parcial:run.posicio<tot,nota:run.posicio?Math.round(run.encerts/run.posicio*100)/10:0,encerts:run.encerts,errors:run.errors,respostes:run.posicio,preguntes:tot,punts:run.guany,total:p.punts,dominat:p.punts>=10000};
+      }
+      const pos=patch.posicio??run.posicio;
+      const guany=patch.guany??run.guany;
+      const encerts=patch.encerts??run.encerts;
+      const errors=patch.errors??run.errors;
+      const anterior=await perfil();
+      const nouTotal=anterior.punts+guany;
+      const tx=await tables.createTransaction();
+      try{
+        await tables.updateRow({databaseId:DB,tableId:PARTIDES,rowId:run.$id,transactionId:tx.$id,data:{posicio:pos,guany,encerts,errors,acabat:true}});
+        await tables.updateRow({databaseId:DB,tableId:PERFILS,rowId:userId,transactionId:tx.$id,data:{
+          punts:nouTotal,partides:anterior.partides+1,
+          encerts:anterior.encerts+encerts,errors:anterior.errors+errors
+        }});
+        await tables.updateTransaction({transactionId:tx.$id,commit:true});
+        return {jaDesada:false,parcial:pos<tot,nota:pos?Math.round(encerts/pos*100)/10:0,encerts,errors,respostes:pos,preguntes:tot,punts:guany,total:nouTotal,dominat:nouTotal>=10000};
+      }catch(e){
+        try{await tables.updateTransaction({transactionId:tx.$id,rollback:true});}catch{}
+        if(e.code===409&&intent<2)continue;
+        throw e;
+      }
+    }
+  };
   if(action==='me'){
     const p=await perfil();
     return res.json({nom:p.nom,punts:p.punts,partides:p.partides,encerts:p.encerts,errors:p.errors,dominat:p.punts>=10000});
@@ -131,6 +164,12 @@ export default async ({req,res,error})=>{
     const qs=JSON.parse(run.preguntes);
     return res.json({partida:run.$id,mode:run.mode,pregunta:pregVisible(qs[run.posicio],run.posicio,qs.length),puntuacio:run.guany});
   }
+  if(action==='leave'){
+    const run=await read(PARTIDES,String(body.partida||''));
+    if(run.usuari!==userId)return res.json({error:'Aquesta partida no és teva.'},403);
+    const resultat=await tancar(run);
+    return res.json({desat:true,final:true,resultat});
+  }
   if(action==='answer'){
     if(typeof body.resposta!=='string'||body.resposta.length>2000)return res.json({error:'Resposta invàlida.'},400);
     const run=await read(PARTIDES,String(body.partida||''));
@@ -142,12 +181,11 @@ export default async ({req,res,error})=>{
     const q=qs[pos],ok=encertada(q,body.resposta);
     const guany=run.guany+punts(ok),correctes=run.encerts+(ok?1:0),fallades=run.errors+(ok?0:1);
     const final=pos+1===qs.length;
-    await write(PARTIDES,run.$id,{posicio:pos+1,guany,encerts:correctes,errors:fallades,acabat:final});
     if(final){
-      const p=await perfil();
-      const np=await write(PERFILS,userId,{nom:p.nom,punts:p.punts+guany,partides:p.partides+1,encerts:p.encerts+correctes,errors:p.errors+fallades});
-      return res.json({correcte:ok,solucio:q.correcta||q.respostes?.join('\n'),puntuacio:guany,final:true,resultat:{nota:Math.round(correctes/qs.length*100)/10,encerts:correctes,errors:fallades,punts:guany,total:np.punts,dominat:np.punts>=10000}});
+      const resultat=await tancar(run,{posicio:pos+1,guany,encerts:correctes,errors:fallades});
+      return res.json({correcte:ok,solucio:q.correcta||q.respostes?.join('\\n'),puntuacio:guany,final:true,resultat});
     }
+    await write(PARTIDES,run.$id,{posicio:pos+1,guany,encerts:correctes,errors:fallades,acabat:false});
     return res.json({correcte:ok,solucio:q.correcta,puntuacio:guany,final:false,pregunta:pregVisible(qs[pos+1],pos+1,qs.length)});
   }
   return res.json({error:'Acció desconeguda.'},400);
