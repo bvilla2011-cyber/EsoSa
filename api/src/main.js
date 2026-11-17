@@ -172,6 +172,33 @@ export default async ({req,res,error})=>{
     return res.json({ranking:(r.rows||r.documents||[]).map((x,i)=>({id:x.$id,posicio:i+1,nom:x.nom,punts:x.punts,partides:x.partides,presencia:Object.values(presenceMap(x.presencia)).some(v=>v.status==='playing')?'playing':Object.keys(presenceMap(x.presencia)).length?'online':null}))});
   }
 
+  if(action==='recommendations'){
+    // Read-only: practice never creates games, answers, points or mastery records.
+    const failed=new Map();let cursor=null;
+    do{
+      const queries=[Query.equal('usuari',userId),Query.orderAsc('$id'),Query.limit(100)];
+      if(cursor)queries.push(Query.cursorAfter(cursor));
+      const result=await tables.listRows({databaseId:DB,tableId:PARTIDES,queries});
+      const rows=result.rows||result.documents||[];
+      for(const run of rows){
+        let qs=[];try{qs=JSON.parse(run.preguntes)}catch{}
+        for(const q of qs){
+          if(q.encert!==false)continue;
+          const apartat=q.apartat||run.mode,id=q.id||questionId(apartat,q);
+          const previous=failed.get(id);
+          if(previous){previous.errors++;continue;}
+          let opcions=q.opcions;
+          if(q.tipus==='test'){
+            const mot=/^Què vol dir «(.+)»\?$/.exec(q.enunciat)?.[1];
+            if(mot&&['lexic','dites'].includes(apartat))opcions=barreja(opcionsDificils(apartat,mot,q.correcta));
+          }
+          failed.set(id,{errors:1,q:{id,apartat,tipus:q.tipus,fase:q.fase,enunciat:q.enunciat,opcions:opcions||null,correcta:q.correcta,respostes:q.respostes||null}});
+        }
+      }
+      cursor=rows.length===100?rows[rows.length-1].$id:null;
+    }while(cursor);
+    return res.json({preguntes:[...failed.values()].sort((a,b)=>b.errors-a.errors)});
+  }
   if(action==='mastery'){
     const runs=[];let cursor=null;
     do{
