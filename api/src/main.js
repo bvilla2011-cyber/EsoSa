@@ -3,6 +3,109 @@ import { opcionsDificils } from '../../src/distractors.js';
 import { createHash } from 'node:crypto';
 import { LEXIC, DITES, CATANYOL } from '../../src/banc.js';
 
+const BUITS=[
+  [
+    "El petard ha ___ amb un soroll fort després d'encendre'l.",
+    "esclatat",
+    "El petard ha ___."
+  ],
+  [
+    "Després de dutxar-me amb aigua calenta, el mirall s'ha ___ completament.",
+    "entelat",
+    "El mirall s'ha ___."
+  ],
+  [
+    "La primera edició del llibre s'ha ___: no queden exemplars disponibles.",
+    "exhaurit",
+    "La primera edició del llibre ja s'ha ___."
+  ],
+  [
+    "Amb la pluja, la barana de ferro s'ha ___, formant òxid.",
+    "rovellat",
+    "La barana de ferro s'ha ___."
+  ],
+  [
+    "En acabar l'obra, han ___ la grua, separant-ne totes les peces.",
+    "desmuntat",
+    "Han acabat l'edifici i han ___ la grua."
+  ],
+  [
+    "Cal ___ la paret amb puntals perquè no caigui sobre nosaltres.",
+    "apuntalar",
+    "___ una paret perquè no caigui."
+  ],
+  [
+    "No has d'___ aquesta notícia: encara és secreta i ningú ho sap.",
+    "escampar",
+    "___ una notícia."
+  ],
+  [
+    "Vull ___ un amic perquè prengui una bona decisió sobre estudis.",
+    "aconsellar",
+    "___ un amic."
+  ],
+  [
+    "Va decidir ___ en un projecte complicat que comportava molts problemes.",
+    "embrancar-se",
+    "___ en un projecte complicat."
+  ],
+  [
+    "Cal ___ el full per la meitat, ajuntant les dues vores.",
+    "doblegar",
+    "___ un full per fer un avió de paper."
+  ],
+  [
+    "Hem de ___ aquestes maletes pesants d'una terminal a l'altra.",
+    "traginar",
+    "___ les maletes per tot l'aeroport."
+  ],
+  [
+    "Cal ___ el vi de l'ampolla a la copa sense vessar-lo.",
+    "abocar",
+    "___ el vi en una copa."
+  ],
+  [
+    "Has de ___ el pernil amb un ganivet per obtenir-ne llesques.",
+    "tallar",
+    "___ el pernil amb un ganivet."
+  ],
+  [
+    "Cal ___ el cinturó perquè els pantalons no em quedin fluixos.",
+    "estrènyer",
+    "___ un cinturó."
+  ],
+  [
+    "Cal ___ el cargol amb el tornavís fins que quedi fix.",
+    "cargolar",
+    "___ un vis."
+  ],
+  [
+    "No sentim la ràdio: cal ___ el volum perquè soni més fort.",
+    "apujar",
+    "___ el so d'un aparell."
+  ],
+  [
+    "Volen ___ l'autopista afegint-hi un carril perquè hi circulin més vehicles.",
+    "eixamplar",
+    "___ una autopista a tres carrils."
+  ],
+  [
+    "Cal ___ el llibre amb plàstic per protegir-ne les cobertes.",
+    "folrar",
+    "___ un llibre per protegir-lo."
+  ],
+  [
+    "Va ___ tota la roba al calaix, amuntegada i sense ordre.",
+    "entaforar",
+    "___ la roba al calaix de qualsevol manera."
+  ],
+  [
+    "Cal ___ l'ampolla: no hi ha de quedar gens de líquid.",
+    "buidar",
+    "___ una ampolla abans de llençar-la al contenidor."
+  ]
+];
+
 const DB='lexico4t', PERFILS='perfils', PARTIDES='partides';
 const barreja=(items)=>{const a=[...items];for(let i=a.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[a[i],a[j]]=[a[j],a[i]];}return a;};
 const normalitza=(s)=>String(s??'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLocaleLowerCase('ca').replace(/[‘’´]/g,"'").replace(/[^a-z0-9çñ·' ]/g,' ').replace(/\s+/g,' ').trim();
@@ -21,24 +124,7 @@ function fabricaBase(mode,complet=false){
    }));
    if(mode==='lexic'){
      // Frases i col·locacions d'exercicis dels apunts; només s'usen respostes documentades.
-     const buits=[
-       ['El petard ha ___.','esclatat'],['El mirall s\'ha ___.','entelat'],
-       ['La primera edició del llibre ja s\'ha ___.','exhaurit'],['La barana de ferro s\'ha ___.','rovellat'],
-       ['Han acabat l\'edifici i han ___ la grua.','desmuntat'],
-       ['___ una paret perquè no caigui.','apuntalar'],
-       ['___ una notícia.','escampar'],['___ un amic.','aconsellar'],
-       ['___ en un projecte complicat.','embrancar-se'],
-       ['___ un full per fer un avió de paper.','doblegar'],
-       ['___ les maletes per tot l\'aeroport.','traginar'],
-       ['___ el vi en una copa.','abocar'],
-       ['___ el pernil amb un ganivet.','tallar'],
-       ['___ un cinturó.','estrènyer'],['___ un vis.','cargolar'],
-       ['___ el so d\'un aparell.','apujar'],
-       ['___ una autopista a tres carrils.','eixamplar'],
-       ['___ un llibre per protegir-lo.','folrar'],
-       ['___ la roba al calaix de qualsevol manera.','entaforar'],
-       ['___ una ampolla abans de llençar-la al contenidor.','buidar']
-     ];
+     const buits=BUITS;
      const omplir=barreja(buits).map(([e,c])=>({tipus:'escriure',fase:'OMPLIR BUITS',enunciat:'Escriu el mot que falta:\n'+e,correcta:c}));
      return [...test,...escriu,...omplir];
    }
@@ -64,7 +150,7 @@ function fabricaBase(mode,complet=false){
 }
 
 const MODES=['lexic','dites','catanyol'];
-const questionId=(mode,q)=>createHash('sha256').update(mode+'|'+q.fase+'|'+q.enunciat+'|'+q.correcta).digest('hex').slice(0,24);
+const questionId=(mode,q)=>createHash('sha256').update(mode+'|'+q.fase+'|'+(mode==='lexic'&&q.fase==='OMPLIR BUITS'?(BUITS.find(x=>x[1]===q.correcta)?.[2]?'Escriu el mot que falta:\n'+BUITS.find(x=>x[1]===q.correcta)[2]:q.enunciat):q.enunciat)+'|'+q.correcta).digest('hex').slice(0,24);
 function fabrica(mode,complet=false){
  if(mode==='mix')return barreja(MODES.flatMap(m=>fabrica(m,complet)));
  return fabricaBase(mode,complet).map(q=>({...q,apartat:mode,id:questionId(mode,q)}));
@@ -192,7 +278,7 @@ export default async ({req,res,error})=>{
             const mot=/^Què vol dir «(.+)»\?$/.exec(q.enunciat)?.[1];
             if(mot&&['lexic','dites'].includes(apartat))opcions=barreja(opcionsDificils(apartat,mot,q.correcta));
           }
-          failed.set(id,{errors:1,q:{id,apartat,tipus:q.tipus,fase:q.fase,enunciat:q.enunciat,opcions:opcions||null,correcta:q.correcta,respostes:q.respostes||null}});
+          failed.set(id,{errors:1,q:{id,apartat,tipus:q.tipus,fase:q.fase,enunciat:apartat==='lexic'&&q.fase==='OMPLIR BUITS'&&BUITS.some(x=>x[1]===q.correcta)?'Escriu el mot que falta:\n'+BUITS.find(x=>x[1]===q.correcta)[0]:q.enunciat,opcions:opcions||null,correcta:q.correcta,respostes:q.respostes||null}});
         }
       }
       cursor=rows.length===100?rows[rows.length-1].$id:null;
@@ -248,6 +334,10 @@ export default async ({req,res,error})=>{
     let actualitzada=false;
     for(let i=run.posicio;i<qs.length;i++){
       const q=qs[i],mode=q.apartat||run.mode;
+      if(mode==='lexic'&&q.fase==='OMPLIR BUITS'){
+        const phrase=BUITS.find(x=>x[1]===q.correcta)?.[0];
+        if(phrase){const updated='Escriu el mot que falta:\n'+phrase;if(q.enunciat!==updated){q.enunciat=updated;actualitzada=true;}}
+      }
       if(q.tipus!=='test'||q.opcions?.length===4)continue;
       const mot=/^Què vol dir «(.+)»\?$/.exec(q.enunciat)?.[1];
       if(!mot||!['lexic','dites'].includes(mode))continue;
