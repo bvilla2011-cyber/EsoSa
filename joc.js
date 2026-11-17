@@ -8,7 +8,7 @@
   const account=new Account(sdk),functions=new Functions(sdk);
   const state={user:null,tab:'login',email:'',tokenUserId:'',run:null,question:null,answerReply:null,points:0,mode:'',busy:false};
   const escapeHTML=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
-  const label=mode=>({lexic:'Lèxic',dites:'Dites',catanyol:'Catanyol',mix:'MIX'})[mode]||'Practicar';
+  const label=mode=>({lexic:'Lèxic',dites:'Dites',catanyol:'Catanyol',mix:'MIX',infinite:'RECOMANACIÓ INFINITA'})[mode]||'Practicar';
   let viewVersion=0,autoTimers=[];
   function show(html){viewVersion++;autoTimers.forEach(clearTimeout);autoTimers=[];el.innerHTML=html;sendPresence();}
   function errorMessage(e){
@@ -39,6 +39,7 @@
     state.authMode=null;await home();
   }
   async function openRun(mode){
+    if(mode==='infinite')return startInfinite();
     let r=await api({action:'resume',mode});
     if(!r.partida)r=await api({action:'start',mode});
     state.mode=r.mode||mode;state.run=r.partida;state.question=r.pregunta;
@@ -237,16 +238,45 @@
     }catch(err){msg(errorMessage(err),true);}
   }
   function pickMode(){
-    show('<div class="panel"><div class="eyebrow">Pràctica</div><h1>Què vols estudiar?</h1><p class="sub">Si tens una partida pendent, es reprendrà automàticament. Cada resposta enviada queda desada.</p><div class="grid2"><section class="mode"><h3>LÈXIC</h3><p>Significats de totes les paraules dels lèxics 37–40, preguntes tipus test, escriptura i buits.</p><button class="btn primary" data-mode="lexic">JUGAR</button></section><section class="mode"><h3>DITES</h3><p>Significats, expressions equivalents i correcció de dites utilitzades amb un sentit inadequat.</p><button class="btn primary" data-mode="dites">JUGAR</button></section><section class="mode"><h3>CATANYOL</h3><p>Textos formats amb exemples dels apunts. Detecta i corregeix les construccions inadequades.</p><button class="btn primary" data-mode="catanyol">JUGAR</button></section><section class="mode"><h3>MIX</h3><p>Lèxic, dites i catanyol en una mateixa partida, amb les preguntes barrejades.</p><button class="btn primary" data-mode="mix">JUGAR</button></section></div><div id="feedback" hidden></div><p style="margin-top:24px"><button class="btn" id="backHome">← Tornar</button></p></div>');
+    show('<div class="panel"><div class="eyebrow">Pràctica</div><h1>Què vols estudiar?</h1><p class="sub">Si tens una partida pendent, es reprendrà automàticament. Cada resposta enviada queda desada.</p><div class="grid2"><section class="mode"><h3>LÈXIC</h3><p>Significats de totes les paraules dels lèxics 37–40, preguntes tipus test, escriptura i buits.</p><button class="btn primary" data-mode="lexic">JUGAR</button></section><section class="mode"><h3>DITES</h3><p>Significats, expressions equivalents i correcció de dites utilitzades amb un sentit inadequat.</p><button class="btn primary" data-mode="dites">JUGAR</button></section><section class="mode"><h3>CATANYOL</h3><p>Textos formats amb exemples dels apunts. Detecta i corregeix les construccions inadequades.</p><button class="btn primary" data-mode="catanyol">JUGAR</button></section><section class="mode"><h3>RECOMANACIÓ INFINITA</h3><p>Practica els teus errors sense límit. Les preguntes que més falles surten més sovint. Sense punts ni canvis al domini.</p><button class="btn secondary" data-mode="infinite">PRACTICAR ERRORS</button></section><section class="mode"><h3>MIX</h3><p>Lèxic, dites i catanyol en una mateixa partida, amb les preguntes barrejades.</p><button class="btn primary" data-mode="mix">JUGAR</button></section></div><div id="feedback" hidden></div><p style="margin-top:24px"><button class="btn" id="backHome">← Tornar</button></p></div>');
     document.getElementById('backHome').onclick=home;
     document.querySelectorAll('[data-mode]').forEach(btn=>btn.onclick=async()=>{if(state.busy)return;state.busy=true;btn.disabled=true;try{await openRun(btn.dataset.mode);}catch(err){msg(errorMessage(err),true);btn.disabled=false;}finally{state.busy=false;}});
   }
 
+
+  const practice={pool:[],count:0,last:null};
+  const practiceNormalize=s=>String(s??'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLocaleLowerCase('ca').replace(/[‘’´]/g,"'").replace(/[^a-z0-9çñ·' ]/g,' ').replace(/\s+/g,' ').trim();
+  function nextPractice(){
+    const candidates=practice.pool;
+    const weight=x=>x.errors*(x.q.id===practice.last?0.35:1);
+    let draw=Math.random()*candidates.reduce((sum,x)=>sum+weight(x),0),chosen=candidates[candidates.length-1];
+    for(const item of candidates){draw-=weight(item);if(draw<0){chosen=item;break;}}
+    practice.last=chosen.q.id;
+    const q={...chosen.q,index:++practice.count,total:'∞'};
+    if(q.opcions){q.opcions=[...q.opcions];for(let i=q.opcions.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[q.opcions[i],q.opcions[j]]=[q.opcions[j],q.opcions[i]];}}
+    return q;
+  }
+  async function startInfinite(){
+    const data=await api({action:'recommendations'});
+    if(!data.preguntes?.length){
+      msg('Encara no tens errors detallats desats. Juga una modalitat normal; aquí apareixeran les preguntes que fallis.');return;
+    }
+    practice.pool=data.preguntes;practice.count=0;practice.last=null;
+    state.mode='infinite';state.run='practice:'+crypto.randomUUID();state.points=0;
+    state.answerReply=null;state.question=nextPractice();renderQuestion();
+  }
+  function practiceAnswer(q,input){
+    const parts=String(input).split(/\n+/).map(practiceNormalize);
+    const correcte=q.tipus==='text'?parts.length===q.respostes.length&&parts.every((x,i)=>x===practiceNormalize(q.respostes[i])):practiceNormalize(input)===practiceNormalize(q.correcta);
+    return {correcte,solucio:q.correcta,puntuacio:0,final:false,pregunta:nextPractice(),practica:true};
+  }
+
   function renderQuestion(){
     const q=state.question;if(!q)return home();
-    const pct=Math.round((q.index-1)/q.total*100),canTest=q.tipus==='test';
-    const section=state.mode==='mix'?'MIX · '+label(q.apartat):label(state.mode);
-    show('<div class="panel"><div class="bar"><div class="eyebrow">'+escapeHTML(section)+' · '+escapeHTML(q.fase)+'</div><strong>'+q.index+' / '+q.total+'</strong></div><div class="progress"><div style="width:'+pct+'%"></div></div><div class="bar"><span class="muted">Punts d’aquesta partida</span><strong id="livePoints">'+state.points+'</strong></div><div class="question">'+escapeHTML(q.enunciat)+'</div><form id="answerForm" class="stack large-gap">'+(canTest?'<div class="stack">'+q.opcions.map(x=>'<label class="option"><input type="radio" name="answer" value="'+escapeHTML(x)+'" required><span>'+escapeHTML(x)+'</span></label>').join('')+'</div>':q.tipus==='text'?'<label>Text corregit (una frase per línia)<textarea name="answer" required spellcheck="true" placeholder="Reescriu aquí tot el text corregit..."></textarea></label>':'<label>Escriu la resposta<input name="answer" required autocomplete="off" spellcheck="true" placeholder="La teva resposta"></label>')+'<button class="btn primary full" type="submit" id="answerButton"'+(canTest?' hidden':'')+'>Comprovar resposta</button><div id="feedback" hidden role="status"></div></form><p class="hint" style="margin-top:24px">'+(canTest?'Tria una opció. Es corregirà i avançarà automàticament.':'Envia la resposta per veure la correcció.')+'</p><button type="button" class="btn secondary full" id="leaveGame" style="margin-top:12px">SORTIR I DESAR PUNTS</button></div>');
+    const infinite=state.mode==='infinite';
+    const pct=infinite?0:Math.round((q.index-1)/q.total*100),canTest=q.tipus==='test';
+    const section=state.mode==='mix'?'MIX · '+label(q.apartat):infinite?'RECOMANACIÓ INFINITA · '+label(q.apartat):label(state.mode);
+    show('<div class="panel"><div class="bar"><div class="eyebrow">'+escapeHTML(section)+' · '+escapeHTML(q.fase)+'</div><strong>'+q.index+' / '+q.total+'</strong></div><div class="progress"'+(infinite?' hidden':'')+'><div style="width:'+pct+'%"></div></div><div class="bar"><span class="muted">'+(infinite?'Pràctica lliure · no modifica punts ni domini':'Punts d’aquesta partida')+'</span><strong id="livePoints">'+(infinite?'∞':state.points)+'</strong></div><div class="question">'+escapeHTML(q.enunciat)+'</div><form id="answerForm" class="stack large-gap">'+(canTest?'<div class="stack">'+q.opcions.map(x=>'<label class="option"><input type="radio" name="answer" value="'+escapeHTML(x)+'" required><span>'+escapeHTML(x)+'</span></label>').join('')+'</div>':q.tipus==='text'?'<label>Text corregit (una frase per línia)<textarea name="answer" required spellcheck="true" placeholder="Reescriu aquí tot el text corregit..."></textarea></label>':'<label>Escriu la resposta<input name="answer" required autocomplete="off" spellcheck="true" placeholder="La teva resposta"></label>')+'<button class="btn primary full" type="submit" id="answerButton"'+(canTest?' hidden':'')+'>Comprovar resposta</button><div id="feedback" hidden role="status"></div></form><p class="hint" style="margin-top:24px">'+(canTest?'Tria una opció. Es corregirà i avançarà automàticament.':'Envia la resposta per veure la correcció.')+'</p><button type="button" class="btn secondary full" id="leaveGame" style="margin-top:12px">SORTIR I DESAR PUNTS</button></div>');
     const version=viewVersion,run=state.run;
     const form=document.getElementById('answerForm'),saved=cache.get(draftKey());
     if(!canTest&&saved?.index===q.index)form.elements.answer.value=String(saved.value||'');
@@ -254,23 +284,26 @@
     const pause=document.createElement('button');pause.type='button';pause.className='btn full';
     pause.textContent='PAUSAR I CONTINUAR MÉS TARD';
     pause.onclick=()=>{if(state.busy)return;state.run=null;state.question=null;state.answerReply=null;home();};
-    document.getElementById('leaveGame').before(pause);
-    document.getElementById('leaveGame').onclick=sortirIGuardar;
+    if(!infinite)document.getElementById('leaveGame').before(pause);
+    const exitButton=document.getElementById('leaveGame');
+    if(infinite)exitButton.textContent='SORTIR DE LA PRÀCTICA';
+    exitButton.onclick=infinite?()=>{if(state.busy)return;cache.remove(draftKey());state.run=null;state.question=null;state.answerReply=null;practice.pool=[];home();}:sortirIGuardar;
     form.onsubmit=async(e)=>{
       e.preventDefault();if(state.busy||state.answerReply)return;
       const inp=String(new FormData(form).get('answer')||'').trim();if(!inp){msg('Introdueix una resposta.',true);return;}
       state.busy=true;
       form.querySelectorAll('input,textarea,button').forEach(n=>n.disabled=true);
-      if(canTest)msg('Desant la resposta…');
+      if(canTest)msg(infinite?'Comprovant…':'Desant la resposta…');
       try{
-        const reply=await api({action:'answer',partida:run,index:q.index,resposta:inp});
+        const reply=infinite?practiceAnswer(q,inp):await api({action:'answer',partida:run,index:q.index,resposta:inp});
         if(viewVersion!==version||state.run!==run)return;
         cache.remove(draftKey());state.points=reply.puntuacio;state.answerReply=reply;sendPresence();
-        document.getElementById('livePoints').textContent=state.points;
+        document.getElementById('livePoints').textContent=infinite?'∞':state.points;
         if(canTest)renderTestFeedback(reply,inp,version);else renderFeedback(reply);
       }catch(err){
         if(viewVersion!==version||state.run!==run)return;
         try{
+          if(infinite)throw err;
           const current=await api({action:'resume',mode:state.mode});
           if(viewVersion!==version||state.run!==run)return;
           if(current.partida===run&&current.pregunta?.index>q.index){
@@ -295,7 +328,7 @@
     const chosen=options.find(n=>n.querySelector('input').value===selected);
     const correct=options.find(n=>n.querySelector('input').value===r.solucio);
     chosen?.classList.add(r.correcte?'answer-good':'answer-bad');
-    msg(r.correcte?'Correcte! +10 punts':'Incorrecte. −5 punts',!r.correcte);
+    msg(r.practica?(r.correcte?'Correcte!':'Incorrecte. Repassem-ho.'):(r.correcte?'Correcte! +10 punts':'Incorrecte. −5 punts'),!r.correcte);
     if(!r.correcte){
       autoTimers.push(setTimeout(()=>{
         if(viewVersion!==version)return;
@@ -312,7 +345,7 @@
     const form=document.getElementById('answerForm');if(!form)return;
     form.querySelectorAll('input,textarea,button').forEach(e=>e.disabled=true);
     const next=document.createElement('section');next.className='stack';
-    next.innerHTML='<div class="result '+(r.correcte?'ok':'bad')+'"><strong>'+(r.correcte?'Resposta correcta: +10 punts':'Resposta incorrecta: −5 punts')+'</strong><div class="preserve-lines">'+escapeHTML(r.correcte?'Molt bé!':('Solució: '+String(r.solucio??'')))+'</div></div><button class="btn primary full" id="nextQuestion">'+(r.final?'VEURE EL RESULTAT':'PREGUNTA SEGÜENT')+'</button>';
+    next.innerHTML='<div class="result '+(r.correcte?'ok':'bad')+'"><strong>'+(r.practica?(r.correcte?'Resposta correcta':'Resposta incorrecta'):(r.correcte?'Resposta correcta: +10 punts':'Resposta incorrecta: −5 punts'))+'</strong><div class="preserve-lines">'+escapeHTML(r.correcte?'Molt bé!':('Solució: '+String(r.solucio??'')))+'</div></div><button class="btn primary full" id="nextQuestion">'+(r.final?'VEURE EL RESULTAT':'PREGUNTA SEGÜENT')+'</button>';
     form.insertAdjacentElement('afterend',next);
     if(r.final)document.getElementById('leaveGame')?.remove();
     document.getElementById('nextQuestion').onclick=()=>advanceAnswer(r);
