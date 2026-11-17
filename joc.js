@@ -225,11 +225,49 @@
       state.tab='login';state.busy=false;renderAuth();
     };
   }
+
+  async function loadPendingGames(version){
+    const modes=['lexic','dites','catanyol','mix'];
+    const results=await Promise.allSettled(modes.map(mode=>api({action:'resume',mode})));
+    if(viewVersion!==version||!state.user)return;
+    const box=document.getElementById('pendingGames');if(!box)return;
+    box.innerHTML='';
+    const pending=results.filter(r=>r.status==='fulfilled'&&r.value.partida&&r.value.pregunta).map(r=>r.value);
+    if(pending.length){
+      const heading=document.createElement('div');heading.className='eyebrow';heading.style.marginBottom='0';
+      heading.textContent=pending.length===1?'Tens una partida pendent':'Les teves partides pendents';box.append(heading);
+      for(const saved of pending){
+        const button=document.createElement('button');button.type='button';button.className='btn secondary full';
+        button.textContent='CONTINUAR PARTIDA · '+label(saved.mode)+' · '+saved.pregunta.index+' / '+saved.pregunta.total;
+        button.onclick=async()=>{
+          if(state.busy)return;state.busy=true;button.disabled=true;
+          try{
+            // Fetch again so another device cannot leave this menu pointing at an old question.
+            const current=await api({action:'resume',mode:saved.mode});
+            if(viewVersion!==version)return;
+            if(!current.partida||!current.pregunta){await home();msg('Aquesta partida ja no està pendent.');return;}
+            state.mode=current.mode;state.run=current.partida;state.question=current.pregunta;
+            state.points=current.puntuacio;state.answerReply=null;renderQuestion();
+          }catch(e){if(viewVersion===version){msg(errorMessage(e),true);button.disabled=false;}}
+          finally{state.busy=false;}
+        };
+        box.append(button);
+      }
+    }
+    if(results.some(r=>r.status==='rejected')){
+      const retry=document.createElement('button');retry.type='button';retry.className='btn small';
+      retry.textContent='Tornar a buscar partides pendents';
+      retry.onclick=()=>{retry.disabled=true;loadPendingGames(version);};box.append(retry);
+    }
+    box.hidden=!box.children.length;
+  }
+
   async function home(){
-    activateSession();show('<div class="panel"><div class="eyebrow">Tauler personal</div><h1>Hola, '+escapeHTML(state.user?.name||'jugador')+'</h1><p class="sub">Aprèn les paraules dels apunts i puja posicions al rànquing.</p><div id="stats" class="score-row"><div class="scorebox"><strong>...</strong><small>Els teus punts</small></div></div><div class="stack"><button class="btn primary full" id="practice">PRACTICAR</button><button class="btn secondary full" id="ranking">RÀNQUING</button></div><button class="btn small history-entry" id="historyButton">Historial i domini</button><p class="hint" style="margin-top:22px">+10 punts per resposta correcta · −5 punts per error · 10.000 punts: EXAMEN DOMINADO</p><div id="feedback" hidden></div></div>');
+    activateSession();show('<div class="panel"><div class="eyebrow">Tauler personal</div><h1>Hola, '+escapeHTML(state.user?.name||'jugador')+'</h1><p class="sub">Aprèn les paraules dels apunts i puja posicions al rànquing.</p><div id="stats" class="score-row"><div class="scorebox"><strong>...</strong><small>Els teus punts</small></div></div><div id="pendingGames" class="stack" style="margin-bottom:16px" hidden></div><div class="stack"><button class="btn primary full" id="practice">PRACTICAR</button><button class="btn secondary full" id="ranking">RÀNQUING</button></div><button class="btn small history-entry" id="historyButton">Historial i domini</button><p class="hint" style="margin-top:22px">+10 punts per resposta correcta · −5 punts per error · 10.000 punts: EXAMEN DOMINADO</p><div id="feedback" hidden></div></div>');
     document.getElementById('practice').onclick=pickMode;
     document.getElementById('ranking').onclick=ranking;
     document.getElementById('historyButton').onclick=historyView;
+    loadPendingGames(viewVersion);
     try{
       const p=await api({action:'me'});
       if(!document.getElementById('stats'))return;
