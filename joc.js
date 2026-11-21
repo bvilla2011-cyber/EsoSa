@@ -513,7 +513,7 @@
     '2026-11-24':[{subject:'Socials',title:'Examen trimestral',group:'C'}],
     '2026-11-25':[{subject:'Anglès',title:'Trimestral',group:''}],
     '2026-11-26':[{subject:'Català',title:'Trimestral',group:''}],
-    '2026-11-27':[{subject:'Biologia i Geologia',title:'Trimestral',group:'4t ESO'}],
+    '2026-11-27':[{subject:'Biologia i Geologia',title:'Trimestral',group:''}],
     '2026-12-02':[{subject:'Matemàtiques',title:'Trimestral',group:''}],
     '2026-12-03':[{subject:'Física i Química',title:'Examen 1r trimestre',group:''}]
   };
