@@ -294,9 +294,10 @@
   }
 
   async function home(){
-    activateSession();show('<div class="panel"><div class="eyebrow">Tauler personal</div><h1>Hola, '+escapeHTML(state.user?.name||'jugador')+'</h1><p class="sub">La teva puntuació i el rànquing continuen guardats a EsoSa.</p><div id="stats" class="score-row"><div class="scorebox"><strong>...</strong><small>Puntuació en Lèxic</small></div></div><div class="stack"><button class="btn primary full" id="practice">PRACTICAR</button><button class="btn secondary full" id="ranking">RÀNQUING</button></div><div id="feedback" hidden></div></div>');
+    activateSession();show('<div class="panel"><div class="eyebrow">Tauler personal</div><h1>Hola, '+escapeHTML(state.user?.name||'jugador')+'</h1><p class="sub">La teva puntuació i el rànquing continuen guardats a EsoSa.</p><div id="stats" class="score-row"><div class="scorebox"><strong>...</strong><small>Puntuació en Lèxic</small></div></div><div class="grid2"><button class="btn primary full" id="practice">PRACTICAR</button><button class="btn secondary full" id="ranking">RÀNQUING</button><button class="btn full" id="calendar">CALENDARI</button></div><div id="feedback" hidden></div></div>');
     document.getElementById('practice').onclick=pickMode;
     document.getElementById('ranking').onclick=chooseRanking;
+    document.getElementById('calendar').onclick=calendarView;
     try{
       const p=await api({action:'me'});
       if(!document.getElementById('stats'))return;
@@ -490,6 +491,34 @@
   function chooseRanking(){
     show('<div class="panel"><div class="eyebrow">Classificació</div><h1>Tria una disciplina</h1><p class="sub">Consulta els punts de cada matèria.</p><button class="mode full" id="lexicRanking"><h3>Lèxic</h3><p>Inclou lèxic, dictats i català.</p><span class="btn primary">VEURE PUNTUACIONS</span></button><button class="btn" id="backHome" style="margin-top:18px">← Tornar</button></div>');
     document.getElementById('lexicRanking').onclick=()=>ranking();document.getElementById('backHome').onclick=home;
+  }
+  const examEvents={
+    '2026-11-24':[{subject:'Socials',title:'Examen trimestral',group:'4t C'}],
+    '2026-11-25':[{subject:'Anglès',title:'Trimestral',group:'Grup B'}],
+    '2026-11-26':[{subject:'Català',title:'Trimestral',group:'4t B'}],
+    '2026-11-27':[{subject:'Biologia i Geologia',title:'Trimestral',group:'4t ESO'}],
+    '2026-12-02':[{subject:'Matemàtiques',title:'Trimestral',group:'4t ESO'}],
+    '2026-12-03':[{subject:'Física i Química',title:'Examen 1r trimestre',group:''}]
+  };
+  let calendarWeek=0;
+  function calendarView(){
+    const today=new Date();today.setHours(0,0,0,0);
+    const monday=new Date(today);monday.setDate(today.getDate()-((today.getDay()+6)%7)+calendarWeek*7);
+    const days=['Dilluns','Dimarts','Dimecres','Dijous','Divendres','Dissabte','Diumenge'];
+    const months=['gener','febrer','març','abril','maig','juny','juliol','agost','setembre','octubre','novembre','desembre'];
+    const formatDate=d=>d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');
+    const dayCards=Array.from({length:7},(_,i)=>{
+      const d=new Date(monday);d.setDate(monday.getDate()+i);
+      const key=formatDate(d),events=examEvents[key]||[];
+      const status=d<today?'past':d.getTime()===today.getTime()?'today':'future';
+      return '<article class="calendar-day '+status+'"><div class="calendar-date"><span>'+days[i]+'</span><strong>'+d.getDate()+'</strong></div><div class="calendar-events">'+(events.length?events.map(e=>'<div class="calendar-event"><strong>'+escapeHTML(e.subject)+'</strong><span>'+escapeHTML(e.title)+'</span>'+(e.group?'<small>'+escapeHTML(e.group)+'</small>':'')+'</div>').join(''):'<span class="calendar-empty">—</span>')+'</div></article>';
+    }).join('');
+    const sunday=new Date(monday);sunday.setDate(monday.getDate()+6);
+    const period=monday.getDate()+' '+months[monday.getMonth()]+' – '+sunday.getDate()+' '+months[sunday.getMonth()]+' '+sunday.getFullYear();
+    show('<div class="panel"><div class="eyebrow">Planificació</div><div class="calendar-heading"><h1>Calendari</h1><div class="calendar-nav"><button class="btn" id="previousWeek" aria-label="Setmana anterior">←</button><button class="btn" id="nextWeek" aria-label="Setmana següent">→</button></div></div><p class="sub calendar-period">'+period+'</p><div class="calendar-week">'+dayCards+'</div><p class="hint">Els dies anteriors, avui i els dies futurs tenen colors diferents.</p><button class="btn" id="calendarHome">← Tornar</button></div>');
+    document.getElementById('previousWeek').onclick=()=>{calendarWeek--;calendarView();};
+    document.getElementById('nextWeek').onclick=()=>{calendarWeek++;calendarView();};
+    document.getElementById('calendarHome').onclick=home;
   }
   async function ranking(refresh=false){
     refresh=refresh===true;
