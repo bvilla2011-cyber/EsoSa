@@ -322,14 +322,38 @@
   function examPractice(id){
     const exam=upcomingExams.find(item=>item.id===id);if(!exam)return pickMode();
     if(id==='socials'){
-      const models=[['Model A · Causes i inici',1],['Model B · Constitució i faccions',2],['Model C · Guerra, República i Terror',3],['Model D · Síntesi i llegat',4]];
-      show('<div class="panel"><div class="eyebrow">Socials · Tema 2</div><h1>Revolució Francesa</h1><p class="sub">Estudia els apunts i practica amb models d’examen diferents. Les dates secundàries no són l’objectiu: prioritzem les que el dossier destaca.</p><div class="grid2"><section class="mode"><h3>Apunts · Tema 2</h3><p>Els nou moments, conceptes clau i les deu dates prioritàries.</p><a class="btn secondary full" href="./apunts-socials-tema-2.html" target="_blank" rel="noopener">OBRIR ELS APUNTS</a></section><section class="mode"><h3>Practicar examen</h3><p>Quatre models en PDF amb formats diferents. El solucionari és al final.</p><a class="btn primary full" href="./examen-socials-tema-2.pdf" target="_blank" rel="noopener">OBRIR EL PDF D’EXÀMENS</a></section></div><h2 style="margin-top:24px">Tria un model</h2><div class="grid2">'+models.map(([name,page])=>'<a class="mode" href="./examen-socials-tema-2.pdf#page='+page+'" target="_blank" rel="noopener"><h3>'+name+'</h3><p>Obre directament aquest model en el PDF.</p><span class="btn full">OBRIR MODEL</span></a>').join('')+'</div><button class="btn full" id="backExams" style="margin-top:20px">← Tornar als exàmens</button></div>');
+      show('<div class="panel"><div class="eyebrow">Socials · Temes 1 i 2</div><h1>Prepara l’examen de Socials</h1><p class="sub">Quatre formularis independents, del model A al D. Cada resposta correcta suma 10 punts al rànquing de Socials i cada error en resta 10. La nota de cada model és sobre 10 i les preguntes tenen pesos diferents.</p><div class="grid2"><section class="mode"><h3>Apunts · Tema 1</h3><a class="btn secondary full" href="./apunts-socials-tema-1.html" target="_blank" rel="noopener">OBRIR ELS APUNTS</a></section><section class="mode"><h3>Apunts · Tema 2</h3><a class="btn secondary full" href="./apunts-socials-tema-2.html" target="_blank" rel="noopener">OBRIR ELS APUNTS</a></section></div><h2>Models d’examen · Temes 1 i 2</h2><div class="grid2">'+['A','B','C','D'].map((m,i)=>'<section class="mode"><h3>Model '+m+'</h3><p>'+['Fonaments','Relacions i conceptes','Aplicació i anàlisi','Síntesi exigent'][i]+'</p><button class="btn primary full" data-social="'+m+'">OBRIR MODEL '+m+'</button></section>').join('')+'</div><button class="btn secondary full" id="socialRank" style="margin-top:18px">RÀNQUING DE SOCIALS</button><button class="btn full" id="backExams" style="margin-top:12px">← Tornar als exàmens</button></div>');
+      document.querySelectorAll('[data-social]').forEach(b=>b.onclick=()=>socialExam(b.dataset.social));
+      document.getElementById('socialRank').onclick=()=>rankingSocial();
       document.getElementById('backExams').onclick=pickMode;
       return;
     }
     const modes=[['Quiz','Preguntes per comprovar què recordes.'],['Targetes de memòria','Recorda la resposta abans de descobrir-la.'],['Repàs dels errors','Torna a practicar allò que més et costa.']];
     show('<div class="panel"><div class="eyebrow">Examen · '+exam.date+'</div><h1>'+exam.name+'</h1><p class="sub">Tria com vols practicar. Les modalitats estaran disponibles quan hi afegim els continguts de l’examen.</p><div class="grid2">'+modes.map(([name,description])=>'<section class="mode"><h3>'+name+' · '+exam.name+'</h3><p>'+description+'</p><button class="btn full" disabled>EN DESENVOLUPAMENT</button></section>').join('')+'</div><button class="btn full" id="backExams" style="margin-top:20px">← Tornar als exàmens</button></div>');
     document.getElementById('backExams').onclick=pickMode;
+  }
+
+  async function socialExam(model){
+    const {questions}=await import('./socials.js');
+    const qs=questions(model),attempt=crypto.randomUUID();
+    show('<div class="panel"><div class="eyebrow">Socials · Temes 1 i 2</div><h1>Model '+model+'</h1><p class="sub">Respon totes les preguntes. La nota pondera els exercicis; els punts del rànquing són +10 o −10 per resposta.</p><form id="socialForm" class="stack">'+qs.map((q,i)=>'<fieldset class="social-question"><legend><strong>'+(i+1)+'. '+escapeHTML(q.text)+'</strong> <small>Pes '+q.weight+'</small></legend>'+q.options.map((option,j)=>'<label class="social-option"><input type="radio" name="'+q.id+'" value="'+j+'" required> '+escapeHTML(option)+'</label>').join('')+'</fieldset>').join('')+'<button class="btn primary full" id="socialSubmit">LLIURAR EXAMEN</button><div id="feedback" hidden></div></form><button class="btn full" id="socialBack">← Tornar als models</button></div>');
+    document.getElementById('socialBack').onclick=()=>examPractice('socials');
+    document.getElementById('socialForm').onsubmit=async e=>{
+      e.preventDefault();if(state.busy)return;
+      const answers=qs.map(q=>Number(new FormData(e.currentTarget).get(q.id)));
+      state.busy=true;document.getElementById('socialSubmit').disabled=true;
+      try{
+        const result=await api({action:'socialFinish',model,attempt,answers});
+        show('<div class="panel"><div class="eyebrow">Socials · Model '+model+'</div><h1>Nota: '+result.nota.toLocaleString('ca-ES')+' / 10</h1><p class="sub">'+result.correctes+' encerts · '+result.errors+' errors · '+(result.punts>=0?'+':'')+result.punts+' punts al rànquing de Socials.</p>'+qs.map((q,i)=>'<section class="mode"><strong>'+(i+1)+'. '+escapeHTML(q.text)+'</strong><p>'+ (result.resultats[i]?'✓ Correcte':'✗ Resposta correcta: '+escapeHTML(q.options[q.correct]))+'</p></section>').join('')+'<button class="btn primary full" id="socialModels">TORNAR ALS MODELS</button><button class="btn secondary full" id="socialRanking">VEURE RÀNQUING DE SOCIALS</button></div>');
+        document.getElementById('socialModels').onclick=()=>examPractice('socials');document.getElementById('socialRanking').onclick=()=>rankingSocial();
+      }catch(err){msg(errorMessage(err),true);document.getElementById('socialSubmit').disabled=false;}
+      finally{state.busy=false;}
+    };
+  }
+  async function rankingSocial(){
+    show('<div class="panel"><div class="eyebrow">Socials</div><h1>Rànquing de Socials</h1><p class="sub">+10 per encert · −10 per error</p><div id="socialList">Carregant...</div><button class="btn full" id="socialReturn">← Tornar als models</button></div>');
+    document.getElementById('socialReturn').onclick=()=>examPractice('socials');
+    try{const r=await api({action:'socialRanking'});const box=document.getElementById('socialList');if(box)box.innerHTML='<table class="ranking"><thead><tr><th>Posició</th><th>Jugador</th><th>Punts</th></tr></thead><tbody>'+r.ranking.map((p,i)=>'<tr><td>'+(i+1)+'</td><td>'+escapeHTML(p.nom)+'</td><td>'+p.punts+'</td></tr>').join('')+'</tbody></table>'+(r.ranking.length?'':'<p>Encara no hi ha resultats.</p>');}catch(e){const box=document.getElementById('socialList');if(box)box.textContent=errorMessage(e);}
   }
 
 
