@@ -321,6 +321,12 @@
   }
   function examPractice(id){
     const exam=upcomingExams.find(item=>item.id===id);if(!exam)return pickMode();
+    if(id==='socials'){
+      const models=[['Model A · Causes i inici',1],['Model B · Constitució i faccions',2],['Model C · Guerra, República i Terror',3],['Model D · Síntesi i llegat',4]];
+      show('<div class="panel"><div class="eyebrow">Socials · Tema 2</div><h1>Revolució Francesa</h1><p class="sub">Estudia els apunts i practica amb models d’examen diferents. Les dates secundàries no són l’objectiu: prioritzem les que el dossier destaca.</p><div class="grid2"><section class="mode"><h3>Apunts · Tema 2</h3><p>Els nou moments, conceptes clau i les deu dates prioritàries.</p><a class="btn secondary full" href="./apunts-socials-tema-2.html" target="_blank" rel="noopener">OBRIR ELS APUNTS</a></section><section class="mode"><h3>Practicar examen</h3><p>Quatre models en PDF amb formats diferents. El solucionari és al final.</p><a class="btn primary full" href="./examen-socials-tema-2.pdf" target="_blank" rel="noopener">OBRIR EL PDF D’EXÀMENS</a></section></div><h2 style="margin-top:24px">Tria un model</h2><div class="grid2">'+models.map(([name,page])=>'<a class="mode" href="./examen-socials-tema-2.pdf#page='+page+'" target="_blank" rel="noopener"><h3>'+name+'</h3><p>Obre directament aquest model en el PDF.</p><span class="btn full">OBRIR MODEL</span></a>').join('')+'</div><button class="btn full" id="backExams" style="margin-top:20px">← Tornar als exàmens</button></div>');
+      document.getElementById('backExams').onclick=pickMode;
+      return;
+    }
     const modes=[['Quiz','Preguntes per comprovar què recordes.'],['Targetes de memòria','Recorda la resposta abans de descobrir-la.'],['Repàs dels errors','Torna a practicar allò que més et costa.']];
     show('<div class="panel"><div class="eyebrow">Examen · '+exam.date+'</div><h1>'+exam.name+'</h1><p class="sub">Tria com vols practicar. Les modalitats estaran disponibles quan hi afegim els continguts de l’examen.</p><div class="grid2">'+modes.map(([name,description])=>'<section class="mode"><h3>'+name+' · '+exam.name+'</h3><p>'+description+'</p><button class="btn full" disabled>EN DESENVOLUPAMENT</button></section>').join('')+'</div><button class="btn full" id="backExams" style="margin-top:20px">← Tornar als exàmens</button></div>');
     document.getElementById('backExams').onclick=pickMode;
