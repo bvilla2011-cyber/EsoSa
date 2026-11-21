@@ -36,31 +36,32 @@
   function clearChallenge(){try{sessionStorage.removeItem('lexic4:challenge')}catch{}}
   async function enterHome(){
     clearChallenge();
-    if(state.pendingCourse&&state.user?.email?.toLowerCase()===state.pendingCourse.email){await account.updatePrefs({course:state.pendingCourse.course,level:state.pendingCourse.level});state.user=await account.get();state.pendingCourse=null;}
+    if(state.pendingCourse&&state.user?.email?.toLowerCase()===state.pendingCourse.email){await account.updatePrefs({course:state.pendingCourse.course,level:state.pendingCourse.level,classGroup:state.pendingCourse.classGroup});state.user=await account.get();state.pendingCourse=null;}
     const course=state.user?.prefs?.course;
     if(course&&course!=='4t ESO'){
       await account.deleteSession({sessionId:'current'}).catch(()=>{});state.user=null;
       show('<div class="panel narrow center"><div class="eyebrow">Accés restringit</div><h1>Aquest curs encara no està disponible</h1><p class="sub">EsoSa està preparat, de moment, per a alumnes de 4t d’ESO. No hem obert el teu compte ni modificat cap puntuació.</p><button class="btn primary" id="restrictedBack">Tornar a l’inici de sessió</button></div>');
       document.getElementById('restrictedBack').onclick=renderAuth;return;
     }
-    if(!course||!state.user?.prefs?.level){renderOnboarding();return;}
+    if(!course||!state.user?.prefs?.level||!state.user?.prefs?.classGroup){renderOnboarding();return;}
     cache.set('device',{email:state.user.email,lastUsed:Date.now()});
     state.authMode=null;await home();
   }
 
   function renderOnboarding(){
     activateSession();
-    show('<div class="panel narrow"><div class="eyebrow">Abans de començar</div><h1>Confirma el teu curs</h1><p class="sub">EsoSa està disponible ara mateix només per a 4t d’ESO. També necessitem el teu nivell de mitjana a les assignatures flexibles.</p><form id="courseForm" class="stack"><label>Curs<select name="course" required><option value="">Tria el teu curs</option><option value="1r ESO">1r d’ESO</option><option value="2n ESO">2n d’ESO</option><option value="3r ESO">3r d’ESO</option><option value="4t ESO">4t d’ESO</option><option value="1r Batxillerat">1r de Batxillerat</option><option value="2n Batxillerat">2n de Batxillerat</option><option value="altre">Un altre curs</option></select></label><label id="levelField" hidden>Nivell de mitjana a les assignatures flexibles<select name="level"><option value="">Tria el teu nivell</option><option>A</option><option>B</option><option>C1</option><option>C2</option></select></label><button class="btn primary full" id="courseSubmit">Continuar</button><div id="feedback" hidden></div></form></div>');
-    const courseSelect=document.querySelector('#courseForm [name=course]'),levelField=document.getElementById('levelField'),levelSelect=levelField.querySelector('select');
-    courseSelect.onchange=()=>{levelField.hidden=courseSelect.value!=='4t ESO';levelSelect.required=!levelField.hidden;};
+    show('<div class="panel narrow"><div class="eyebrow">Abans de començar</div><h1>Confirma les teves dades</h1><p class="sub">EsoSa està disponible ara mateix per a 4t d’ESO. Indica també el nivell de les assignatures flexibles i el teu grup classe.</p><form id="courseForm" class="stack"><label>Curs<select name="course" required><option value="">Tria el teu curs</option><option value="1r ESO">1r d’ESO</option><option value="2n ESO">2n d’ESO</option><option value="3r ESO">3r d’ESO</option><option value="4t ESO">4t d’ESO</option></select></label><label id="levelField" hidden>Nivell de mitjana a les assignatures flexibles<select name="level"><option value="">Tria el teu nivell</option><option>A</option><option>B</option><option>C1</option><option>C2</option></select></label><label id="classGroupField" hidden>Grup classe<select name="classGroup"><option value="">Tria el teu grup</option><option>A</option><option>B</option><option>C</option></select></label><button class="btn primary full" id="courseSubmit">Continuar</button><div id="feedback" hidden></div></form></div>');
+    const courseSelect=document.querySelector('#courseForm [name=course]'),levelField=document.getElementById('levelField'),levelSelect=levelField.querySelector('select'),classGroupField=document.getElementById('classGroupField'),classGroupSelect=classGroupField.querySelector('select');
+    courseSelect.onchange=()=>{levelField.hidden=courseSelect.value!=='4t ESO';levelSelect.required=!levelField.hidden;classGroupField.hidden=!levelField.hidden;classGroupSelect.required=!classGroupField.hidden;};
     document.getElementById('courseForm').onsubmit=async e=>{
       e.preventDefault();if(state.busy)return;state.busy=true;
       const button=document.getElementById('courseSubmit');button.disabled=true;
-      const data=new FormData(e.currentTarget),course=String(data.get('course')),level=String(data.get('level'));
+      const data=new FormData(e.currentTarget),course=String(data.get('course')),level=String(data.get('level')),classGroup=String(data.get('classGroup'));
       try{
         if(course!=='4t ESO')throw Error('De moment, EsoSa només deixa entrar alumnes de 4t d’ESO.');
         if(!['A','B','C1','C2'].includes(level))throw Error('Tria el teu nivell de mitjana.');
-        await account.updatePrefs({course,level});state.user=await account.get();await enterHome();
+        if(!['A','B','C'].includes(classGroup))throw Error('Tria el teu grup classe.');
+        await account.updatePrefs({course,level,classGroup});state.user=await account.get();await enterHome();
       }catch(err){msg(errorMessage(err),true);if(button.isConnected)button.disabled=false;}
       finally{state.busy=false;}
     };
@@ -185,9 +186,9 @@
   function renderAuth(){
     activateSession();if(state.user)return home();
     const registration=state.tab==='register';
-    show('<div class="panel narrow"><div class="eyebrow">Benvingut a EsoSa</div><h1>Aprèn. Practica. Suma punts.</h1><p class="sub">Entra amb el teu compte per conservar la puntuació i competir al rànquing.</p><div class="tabs"><button id="toLogin" class="'+(!registration?'active':'')+'">Iniciar sessió</button><button id="toRegister" class="'+(registration?'active':'')+'">Registrar-se</button></div><form id="authForm" class="stack">'+(registration?'<label>Nom per al rànquing<input name="name" maxlength="60" required autocomplete="nickname" placeholder="El teu nom de jugador"></label><label>Curs<select name="course" required><option value="">Tria el teu curs</option><option value="1r ESO">1r d’ESO</option><option value="2n ESO">2n d’ESO</option><option value="3r ESO">3r d’ESO</option><option value="4t ESO">4t d’ESO</option><option value="1r Batxillerat">1r de Batxillerat</option><option value="2n Batxillerat">2n de Batxillerat</option><option value="altre">Un altre curs</option></select></label><label id="registrationLevel" hidden>Nivell de mitjana a les assignatures flexibles<select name="level"><option value="">Tria el teu nivell</option><option>A</option><option>B</option><option>C1</option><option>C2</option></select></label>':'')+'<label>Correu electrònic<input name="email" type="email" required autocomplete="email" placeholder="correu@exemple.cat"></label><label>Contrasenya<input name="password" type="password" required minlength="8" autocomplete="'+(registration?'new-password':'current-password')+'" placeholder="8 caràcters com a mínim"></label><button id="submitAuth" class="btn primary full" type="submit">'+(registration?'Crear el meu compte':'Continuar')+'</button><div id="feedback" hidden></div><p class="hint">'+(registration?'Cal ser de 4t d’ESO per accedir-hi. El primer codi confirmarà el teu correu.':'En iniciar sessió, et demanarem el curs i el nivell si encara no els has indicat.')+'</p></form></div>');
+    show('<div class="panel narrow"><div class="eyebrow">Benvingut a EsoSa</div><h1>Aprèn. Practica. Suma punts.</h1><p class="sub">Entra amb el teu compte per conservar la puntuació i competir al rànquing.</p><div class="tabs"><button id="toLogin" class="'+(!registration?'active':'')+'">Iniciar sessió</button><button id="toRegister" class="'+(registration?'active':'')+'">Registrar-se</button></div><form id="authForm" class="stack">'+(registration?'<label>Nom per al rànquing<input name="name" maxlength="60" required autocomplete="nickname" placeholder="El teu nom de jugador"></label><label>Curs<select name="course" required><option value="">Tria el teu curs</option><option value="1r ESO">1r d’ESO</option><option value="2n ESO">2n d’ESO</option><option value="3r ESO">3r d’ESO</option><option value="4t ESO">4t d’ESO</option></select></label><label id="registrationLevel" hidden>Nivell de mitjana a les assignatures flexibles<select name="level"><option value="">Tria el teu nivell</option><option>A</option><option>B</option><option>C1</option><option>C2</option></select></label><label id="registrationGroup" hidden>Grup classe<select name="classGroup"><option value="">Tria el teu grup</option><option>A</option><option>B</option><option>C</option></select></label>':'')+'<label>Correu electrònic<input name="email" type="email" required autocomplete="email" placeholder="correu@exemple.cat"></label><label>Contrasenya<input name="password" type="password" required minlength="8" autocomplete="'+(registration?'new-password':'current-password')+'" placeholder="8 caràcters com a mínim"></label><button id="submitAuth" class="btn primary full" type="submit">'+(registration?'Crear el meu compte':'Continuar')+'</button><div id="feedback" hidden></div><p class="hint">'+(registration?'Cal ser de 4t d’ESO per accedir-hi. El primer codi confirmarà el teu correu.':'En iniciar sessió, et demanarem el curs i el nivell si encara no els has indicat.')+'</p></form></div>');
     document.querySelector('[name=email]').value=state.email||cache.get('device')?.email||'';
-    if(registration){const courseInput=document.querySelector('#authForm [name=course]'),levelLabel=document.getElementById('registrationLevel'),levelInput=levelLabel.querySelector('select');courseInput.onchange=()=>{levelLabel.hidden=courseInput.value!=='4t ESO';levelInput.required=!levelLabel.hidden;};}
+    if(registration){const courseInput=document.querySelector('#authForm [name=course]'),levelLabel=document.getElementById('registrationLevel'),levelInput=levelLabel.querySelector('select'),groupLabel=document.getElementById('registrationGroup'),groupInput=groupLabel.querySelector('select');courseInput.onchange=()=>{levelLabel.hidden=courseInput.value!=='4t ESO';levelInput.required=!levelLabel.hidden;groupLabel.hidden=!levelLabel.hidden;groupInput.required=!groupLabel.hidden;};}
     document.getElementById('toLogin').onclick=()=>{state.tab='login';renderAuth()};
     document.getElementById('toRegister').onclick=()=>{state.tab='register';renderAuth()};
     document.getElementById('authForm').onsubmit=async(e)=>{
@@ -199,12 +200,13 @@
       const email=String(formData.get('email')).trim().toLowerCase(),password=String(formData.get('password'));
       try{
         if(registration){
-          const name=String(formData.get('name')||'').trim(),course=String(formData.get('course')||''),level=String(formData.get('level')||'');
+          const name=String(formData.get('name')||'').trim(),course=String(formData.get('course')||''),level=String(formData.get('level')||''),classGroup=String(formData.get('classGroup')||'');
           if(name.length<2)throw Error('Escriu un nom de com a mínim 2 caràcters.');
           if(course!=='4t ESO')throw Error('De moment, EsoSa només deixa entrar alumnes de 4t d’ESO.');
-          if(!['A','B','C1','C2'].includes(level))throw Error('Tria el teu nivell de mitjana.')
+          if(!['A','B','C1','C2'].includes(level))throw Error('Tria el teu nivell de mitjana.');
+          if(!['A','B','C'].includes(classGroup))throw Error('Tria el teu grup classe.');
           await account.create({userId:ID.unique(),email,password,name});
-          state.pendingCourse={course,level,email};
+          state.pendingCourse={course,level,classGroup,email};
           state.tab='login';
           renderAuth();
           msg('Compte creat. Inicia sessió amb la mateixa contrasenya.',false);
@@ -508,11 +510,11 @@
     document.getElementById('lexicRanking').onclick=()=>ranking();document.getElementById('backHome').onclick=home;
   }
   const examEvents={
-    '2026-11-24':[{subject:'Socials',title:'Examen trimestral',group:'4t C'}],
-    '2026-11-25':[{subject:'Anglès',title:'Trimestral',group:'Grup B'}],
-    '2026-11-26':[{subject:'Català',title:'Trimestral',group:'4t B'}],
+    '2026-11-24':[{subject:'Socials',title:'Examen trimestral',group:'C'}],
+    '2026-11-25':[{subject:'Anglès',title:'Trimestral',group:''}],
+    '2026-11-26':[{subject:'Català',title:'Trimestral',group:''}],
     '2026-11-27':[{subject:'Biologia i Geologia',title:'Trimestral',group:'4t ESO'}],
-    '2026-12-02':[{subject:'Matemàtiques',title:'Trimestral',group:'4t ESO'}],
+    '2026-12-02':[{subject:'Matemàtiques',title:'Trimestral',group:''}],
     '2026-12-03':[{subject:'Física i Química',title:'Examen 1r trimestre',group:''}]
   };
   let calendarWeek=0;
@@ -524,7 +526,7 @@
     const formatDate=d=>d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');
     const dayCards=Array.from({length:7},(_,i)=>{
       const d=new Date(monday);d.setDate(monday.getDate()+i);
-      const key=formatDate(d),events=examEvents[key]||[];
+      const key=formatDate(d),events=(examEvents[key]||[]).filter(e=>!e.group||e.group===state.user?.prefs?.classGroup);
       const status=d<today?'past':d.getTime()===today.getTime()?'today':'future';
       return '<article class="calendar-day '+status+'"><div class="calendar-date"><span>'+days[i]+'</span><strong>'+d.getDate()+'</strong></div><div class="calendar-events">'+(events.length?events.map(e=>'<div class="calendar-event"><strong>'+escapeHTML(e.subject)+'</strong><span>'+escapeHTML(e.title)+'</span>'+(e.group?'<small>'+escapeHTML(e.group)+'</small>':'')+'</div>').join(''):'<span class="calendar-empty">—</span>')+'</div></article>';
     }).join('');
