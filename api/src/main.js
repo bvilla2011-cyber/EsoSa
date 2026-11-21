@@ -93,8 +93,8 @@ export default async ({req,res,error})=>{
   const sessClient=new Client().setEndpoint(process.env.APPWRITE_FUNCTION_API_ENDPOINT||'https://fra.cloud.appwrite.io/v1').setProject(process.env.APPWRITE_FUNCTION_PROJECT_ID).setJWT(jwt);
   const me=await new (await import('node-appwrite')).Account(sessClient).get();
   if(me.$id!==userId) return res.json({error:'Sessió no vàlida.'},401);
-  if(me.prefs?.course!=='4t ESO'||!['A','B','C1','C2'].includes(me.prefs?.level))
-    return res.json({error:'Cal confirmar que ets de 4t d’ESO i indicar el teu nivell.'},403);
+  if(me.prefs?.course!=='4t ESO'||!['A','B','C1','C2'].includes(me.prefs?.level)||!['A','B','C'].includes(me.prefs?.classGroup))
+    return res.json({error:'Cal confirmar que ets de 4t d’ESO i indicar el nivell flexible i el grup classe.'},403);
   const read=async (table,rowId)=>tables.getRow({databaseId:DB,tableId:table,rowId});
   const write=async (table,rowId,data)=>tables.updateRow({databaseId:DB,tableId:table,rowId,data});
   const inicial=()=>({nom:String(me.name||'Jugador').slice(0,80),punts:0,partides:0,encerts:0,errors:0});
