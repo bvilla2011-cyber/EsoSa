@@ -343,8 +343,8 @@
       state.busy=true;document.getElementById('socialSubmit').disabled=true;
       try{
         const result=await api({action:'socialFinish',model,attempt,answers});
-        show('<div class="panel"><div class="eyebrow">Socials · Model '+model+'</div><h1>Nota: '+result.nota.toLocaleString('ca-ES')+' / 10</h1><p class="sub">'+result.correctes+' encerts · '+result.errors+' errors · '+(result.punts>=0?'+':'')+result.punts+' punts al rànquing de Socials.</p>'+qs.map((q,i)=>'<section class="mode"><strong>'+(i+1)+'. '+escapeHTML(q.text)+'</strong><p>'+ (result.resultats[i]?'✓ Correcte':'✗ Resposta correcta: '+escapeHTML(q.options[q.correct]))+'</p></section>').join('')+'<button class="btn primary full" id="socialModels">TORNAR ALS MODELS</button><button class="btn secondary full" id="socialRanking">VEURE RÀNQUING DE SOCIALS</button></div>');
-        document.getElementById('socialModels').onclick=()=>examPractice('socials');document.getElementById('socialRanking').onclick=()=>rankingSocial();
+        show('<div class="panel"><div class="eyebrow">Socials · Model '+model+'</div><h1>Nota: '+result.nota.toLocaleString('ca-ES')+' / 10</h1><p class="sub">'+result.correctes+' encerts · '+result.errors+' errors · '+(result.punts>=0?'+':'')+result.punts+' punts al rànquing de Socials.</p>'+qs.map((q,i)=>'<section class="mode"><strong>'+(i+1)+'. '+escapeHTML(q.text)+'</strong><p>'+ (result.resultats[i]?'✓ Correcte':'✗ Resposta correcta: '+escapeHTML(q.options[q.correct]))+'</p></section>').join('')+'<button class="btn primary full" id="socialModels">TORNAR ALS MODELS</button></div>');
+        document.getElementById('socialModels').onclick=()=>examPractice('socials');
       }catch(err){msg(errorMessage(err),true);document.getElementById('socialSubmit').disabled=false;}
       finally{state.busy=false;}
     };
