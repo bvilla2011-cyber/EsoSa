@@ -294,19 +294,34 @@
   }
 
   async function home(){
-    activateSession();show('<div class="panel"><div class="eyebrow">Tauler personal</div><h1>Hola, '+escapeHTML(state.user?.name||'jugador')+'</h1><p class="sub">La teva puntuació i el rànquing continuen guardats a EsoSa.</p><div id="stats" class="score-row"><div class="scorebox"><strong>...</strong><small>Puntuació en Lèxic</small></div></div><div class="grid2"><button class="btn primary full" id="practice">PRACTICAR</button><button class="btn secondary full" id="ranking">RÀNQUING</button><button class="btn full" id="calendar">CALENDARI</button></div><div id="feedback" hidden></div></div>');
+    activateSession();show('<div class="panel"><div class="eyebrow">Tauler personal</div><h1>Hola, '+escapeHTML(state.user?.name||'jugador')+'</h1><p class="sub">La teva puntuació i el rànquing continuen guardats a EsoSa.</p><div id="stats" class="score-row"><div class="scorebox"><strong>...</strong><small>Puntuació en Lèxic · primer trimestre</small></div></div><div class="grid2"><button class="btn primary full" id="practice">PRACTICAR</button><button class="btn secondary full" id="ranking">RÀNQUING</button><button class="btn full" id="calendar">CALENDARI</button></div><div id="feedback" hidden></div></div>');
     document.getElementById('practice').onclick=pickMode;
     document.getElementById('ranking').onclick=chooseRanking;
     document.getElementById('calendar').onclick=calendarView;
     try{
       const p=await api({action:'me'});
       if(!document.getElementById('stats'))return;
-      document.getElementById('stats').innerHTML='<div class="scorebox"><strong>'+p.punts+'</strong><small>Puntuació en Lèxic</small></div>';
+      document.getElementById('stats').innerHTML='<div class="scorebox"><strong>'+p.punts+'</strong><small>Puntuació en Lèxic · primer trimestre</small></div>';
     }catch(err){msg(errorMessage(err),true);}
   }
+  const upcomingExams=[
+    {id:'socials',name:'Socials',date:'24 de novembre',first:true},
+    {id:'angles',name:'Anglès',date:'25 de novembre'},
+    {id:'catala',name:'Català',date:'26 de novembre'},
+    {id:'biologia',name:'Biologia i Geologia',date:'27 de novembre'},
+    {id:'matematiques',name:'Matemàtiques',date:'2 de desembre'},
+    {id:'fisica',name:'Física i Química',date:'3 de desembre'}
+  ];
   function pickMode(){
-    show('<div class="panel narrow"><div class="eyebrow">Continguts</div><h1>Estem preparant EsoSa</h1><p class="sub">Hem retirat els exercicis anteriors per començar una nova etapa. El primer bloc de continguts arribarà en el següent pas.</p><section class="mode"><h3>Lèxic</h3><p>La disciplina inclourà lèxic, dictats i català.</p></section><button class="btn full" id="backHome" style="margin-top:20px">← Tornar</button></div>');
+    show('<div class="panel"><div class="eyebrow">Pràctica</div><h1>Tria un examen</h1><p class="sub">Entra a una assignatura per veure les modalitats de pràctica.</p><div class="grid2">'+upcomingExams.map(exam=>'<section class="mode"><h3>'+exam.name+'</h3><p>Examen · '+exam.date+'</p><span class="hint">En desenvolupament'+(exam.first?' · Començarem per Socials':'')+'</span><button class="btn secondary" data-exam="'+exam.id+'">VEURE MODALITATS</button></section>').join('')+'</div><button class="btn full" id="backHome" style="margin-top:20px">← Tornar</button></div>');
     document.getElementById('backHome').onclick=home;
+    document.querySelectorAll('[data-exam]').forEach(button=>button.onclick=()=>examPractice(button.dataset.exam));
+  }
+  function examPractice(id){
+    const exam=upcomingExams.find(item=>item.id===id);if(!exam)return pickMode();
+    const modes=[['Quiz','Preguntes per comprovar què recordes.'],['Targetes de memòria','Recorda la resposta abans de descobrir-la.'],['Repàs dels errors','Torna a practicar allò que més et costa.']];
+    show('<div class="panel"><div class="eyebrow">Examen · '+exam.date+'</div><h1>'+exam.name+'</h1><p class="sub">Tria com vols practicar. Les modalitats estaran disponibles quan hi afegim els continguts de l’examen.</p><div class="grid2">'+modes.map(([name,description])=>'<section class="mode"><h3>'+name+' · '+exam.name+'</h3><p>'+description+'</p><button class="btn full" disabled>EN DESENVOLUPAMENT</button></section>').join('')+'</div><button class="btn full" id="backExams" style="margin-top:20px">← Tornar als exàmens</button></div>');
+    document.getElementById('backExams').onclick=pickMode;
   }
 
 
@@ -489,7 +504,7 @@
     }catch(e){if(viewVersion===version)msg(errorMessage(e),true);}
   }
   function chooseRanking(){
-    show('<div class="panel"><div class="eyebrow">Classificació</div><h1>Tria una disciplina</h1><p class="sub">Consulta els punts de cada matèria.</p><button class="mode full" id="lexicRanking"><h3>Lèxic</h3><p>Inclou lèxic, dictats i català.</p><span class="btn primary">VEURE PUNTUACIONS</span></button><button class="btn" id="backHome" style="margin-top:18px">← Tornar</button></div>');
+    show('<div class="panel"><div class="eyebrow">Classificació</div><h1>Tria una disciplina</h1><p class="sub">Consulta els punts de cada matèria.</p><button class="mode full" id="lexicRanking"><h3>Lèxic · primer trimestre</h3><p>Inclou lèxic, dictats i català.</p><span class="btn primary">VEURE PUNTUACIONS</span></button><button class="btn" id="backHome" style="margin-top:18px">← Tornar</button></div>');
     document.getElementById('lexicRanking').onclick=()=>ranking();document.getElementById('backHome').onclick=home;
   }
   const examEvents={
@@ -522,7 +537,7 @@
   }
   async function ranking(refresh=false){
     refresh=refresh===true;
-    if(!refresh)show('<div class="panel"><div class="eyebrow">Classificació pública · Lèxic</div><h1>Rànquing de Lèxic</h1><p class="sub">Inclou lèxic, dictats i català. La puntuació i les posicions anteriors es conserven.</p><p class="presence-legend"><span><i class="presence-dot online" aria-hidden="true"></i> Connectat</span><span><i class="presence-dot playing" aria-hidden="true"></i> En partida</span></p><div id="list"><p>Carregant puntuacions...</p></div><button class="btn secondary" id="chooseDiscipline">← Tria una altra disciplina</button><div id="feedback" hidden></div></div>');
+    if(!refresh)show('<div class="panel"><div class="eyebrow">Classificació pública · Lèxic · primer trimestre</div><h1>Rànquing de Lèxic · primer trimestre</h1><p class="sub">Inclou lèxic, dictats i català. La puntuació i les posicions anteriors es conserven.</p><p class="presence-legend"><span><i class="presence-dot online" aria-hidden="true"></i> Connectat</span><span><i class="presence-dot playing" aria-hidden="true"></i> En partida</span></p><div id="list"><p>Carregant puntuacions...</p></div><button class="btn secondary" id="chooseDiscipline">← Tria una altra disciplina</button><div id="feedback" hidden></div></div>');
     if(!refresh)document.getElementById('chooseDiscipline').onclick=chooseRanking;
     try{
       const data=await api({action:'ranking'});
