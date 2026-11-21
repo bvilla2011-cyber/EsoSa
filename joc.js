@@ -6,7 +6,7 @@
   if(!Client){el.innerHTML='<div class="panel"><h2>No s\'ha pogut carregar el joc.</h2><p>Comprova la connexió a Internet i torna a carregar la pàgina.</p></div>';return;}
   const sdk=new Client().setEndpoint('https://fra.cloud.appwrite.io/v1').setProject('lexico-4t-joc');
   const account=new Account(sdk),functions=new Functions(sdk);
-  const state={user:null,tab:'login',email:'',tokenUserId:'',run:null,question:null,answerReply:null,points:0,mode:'',busy:false};
+  const state={user:null,tab:'login',email:'',tokenUserId:'',run:null,question:null,answerReply:null,points:0,mode:'',busy:false,pendingCourse:null};
   const escapeHTML=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
   const label=mode=>({lexic:'Lèxic',dites:'Dites',catanyol:'Catanyol',mix:'MIX',infinite:'RECOMANACIÓ INFINITA'})[mode]||'Practicar';
   let viewVersion=0,autoTimers=[];
@@ -35,8 +35,35 @@
   }
   function clearChallenge(){try{sessionStorage.removeItem('lexic4:challenge')}catch{}}
   async function enterHome(){
-    clearChallenge();cache.set('device',{email:state.user.email,lastUsed:Date.now()});
+    clearChallenge();
+    if(state.pendingCourse&&state.user?.email?.toLowerCase()===state.pendingCourse.email){await account.updatePrefs({course:state.pendingCourse.course,level:state.pendingCourse.level});state.user=await account.get();state.pendingCourse=null;}
+    const course=state.user?.prefs?.course;
+    if(course&&course!=='4t ESO'){
+      await account.deleteSession({sessionId:'current'}).catch(()=>{});state.user=null;
+      show('<div class="panel narrow center"><div class="eyebrow">Accés restringit</div><h1>Aquest curs encara no està disponible</h1><p class="sub">EsoSa està preparat, de moment, per a alumnes de 4t d’ESO. No hem obert el teu compte ni modificat cap puntuació.</p><button class="btn primary" id="restrictedBack">Tornar a l’inici de sessió</button></div>');
+      document.getElementById('restrictedBack').onclick=renderAuth;return;
+    }
+    if(!course||!state.user?.prefs?.level){renderOnboarding();return;}
+    cache.set('device',{email:state.user.email,lastUsed:Date.now()});
     state.authMode=null;await home();
+  }
+
+  function renderOnboarding(){
+    activateSession();
+    show('<div class="panel narrow"><div class="eyebrow">Abans de començar</div><h1>Confirma el teu curs</h1><p class="sub">EsoSa està disponible ara mateix només per a 4t d’ESO. També necessitem el teu nivell de mitjana a les assignatures flexibles.</p><form id="courseForm" class="stack"><label>Curs<select name="course" required><option value="">Tria el teu curs</option><option value="1r ESO">1r d’ESO</option><option value="2n ESO">2n d’ESO</option><option value="3r ESO">3r d’ESO</option><option value="4t ESO">4t d’ESO</option><option value="1r Batxillerat">1r de Batxillerat</option><option value="2n Batxillerat">2n de Batxillerat</option><option value="altre">Un altre curs</option></select></label><label id="levelField" hidden>Nivell de mitjana a les assignatures flexibles<select name="level"><option value="">Tria el teu nivell</option><option>A</option><option>B</option><option>C1</option><option>C2</option></select></label><button class="btn primary full" id="courseSubmit">Continuar</button><div id="feedback" hidden></div></form></div>');
+    const courseSelect=document.querySelector('#courseForm [name=course]'),levelField=document.getElementById('levelField'),levelSelect=levelField.querySelector('select');
+    courseSelect.onchange=()=>{levelField.hidden=courseSelect.value!=='4t ESO';levelSelect.required=!levelField.hidden;};
+    document.getElementById('courseForm').onsubmit=async e=>{
+      e.preventDefault();if(state.busy)return;state.busy=true;
+      const button=document.getElementById('courseSubmit');button.disabled=true;
+      const data=new FormData(e.currentTarget),course=String(data.get('course')),level=String(data.get('level'));
+      try{
+        if(course!=='4t ESO')throw Error('De moment, EsoSa només deixa entrar alumnes de 4t d’ESO.');
+        if(!['A','B','C1','C2'].includes(level))throw Error('Tria el teu nivell de mitjana.');
+        await account.updatePrefs({course,level});state.user=await account.get();await enterHome();
+      }catch(err){msg(errorMessage(err),true);if(button.isConnected)button.disabled=false;}
+      finally{state.busy=false;}
+    };
   }
   async function openRun(mode){
     if(mode==='infinite')return startInfinite();
@@ -158,8 +185,9 @@
   function renderAuth(){
     activateSession();if(state.user)return home();
     const registration=state.tab==='register';
-    show('<div class="panel narrow"><div class="eyebrow">Benvingut al teu entrenament</div><h1>Aprèn català. Suma punts.</h1><p class="sub">Entra amb el teu compte per conservar la teva puntuació i competir al rànquing.</p><div class="tabs"><button id="toLogin" class="'+(!registration?'active':'')+'">Iniciar sessió</button><button id="toRegister" class="'+(registration?'active':'')+'">Registrar-se</button></div><form id="authForm" class="stack">'+(registration?'<label>Nom per al rànquing<input name="name" maxlength="60" required autocomplete="nickname" placeholder="El teu nom de jugador"></label>':'')+'<label>Correu electrònic<input name="email" type="email" required autocomplete="email" placeholder="correu@exemple.cat"></label><label>Contrasenya<input name="password" type="password" required minlength="8" autocomplete="'+(registration?'new-password':'current-password')+'" placeholder="8 caràcters com a mínim"></label><button id="submitAuth" class="btn primary full" type="submit">'+(registration?'Crear el meu compte':'Continuar')+'</button><div id="feedback" hidden></div><p class="hint">'+(registration?'Després del registre, inicia sessió. El primer codi confirmarà el teu correu.':'El codi per correu es verifica dins la sessió, sense eliminar-la. Aquest dispositiu conservarà la sessió fins que premis «Sortir».')+'</p></form></div>');
+    show('<div class="panel narrow"><div class="eyebrow">Benvingut a EsoSa</div><h1>Aprèn. Practica. Suma punts.</h1><p class="sub">Entra amb el teu compte per conservar la puntuació i competir al rànquing.</p><div class="tabs"><button id="toLogin" class="'+(!registration?'active':'')+'">Iniciar sessió</button><button id="toRegister" class="'+(registration?'active':'')+'">Registrar-se</button></div><form id="authForm" class="stack">'+(registration?'<label>Nom per al rànquing<input name="name" maxlength="60" required autocomplete="nickname" placeholder="El teu nom de jugador"></label><label>Curs<select name="course" required><option value="">Tria el teu curs</option><option value="1r ESO">1r d’ESO</option><option value="2n ESO">2n d’ESO</option><option value="3r ESO">3r d’ESO</option><option value="4t ESO">4t d’ESO</option><option value="1r Batxillerat">1r de Batxillerat</option><option value="2n Batxillerat">2n de Batxillerat</option><option value="altre">Un altre curs</option></select></label><label id="registrationLevel" hidden>Nivell de mitjana a les assignatures flexibles<select name="level"><option value="">Tria el teu nivell</option><option>A</option><option>B</option><option>C1</option><option>C2</option></select></label>':'')+'<label>Correu electrònic<input name="email" type="email" required autocomplete="email" placeholder="correu@exemple.cat"></label><label>Contrasenya<input name="password" type="password" required minlength="8" autocomplete="'+(registration?'new-password':'current-password')+'" placeholder="8 caràcters com a mínim"></label><button id="submitAuth" class="btn primary full" type="submit">'+(registration?'Crear el meu compte':'Continuar')+'</button><div id="feedback" hidden></div><p class="hint">'+(registration?'Cal ser de 4t d’ESO per accedir-hi. El primer codi confirmarà el teu correu.':'En iniciar sessió, et demanarem el curs i el nivell si encara no els has indicat.')+'</p></form></div>');
     document.querySelector('[name=email]').value=state.email||cache.get('device')?.email||'';
+    if(registration){const courseInput=document.querySelector('#authForm [name=course]'),levelLabel=document.getElementById('registrationLevel'),levelInput=levelLabel.querySelector('select');courseInput.onchange=()=>{levelLabel.hidden=courseInput.value!=='4t ESO';levelInput.required=!levelLabel.hidden;};}
     document.getElementById('toLogin').onclick=()=>{state.tab='login';renderAuth()};
     document.getElementById('toRegister').onclick=()=>{state.tab='register';renderAuth()};
     document.getElementById('authForm').onsubmit=async(e)=>{
@@ -171,9 +199,12 @@
       const email=String(formData.get('email')).trim().toLowerCase(),password=String(formData.get('password'));
       try{
         if(registration){
-          const name=String(formData.get('name')||'').trim();
+          const name=String(formData.get('name')||'').trim(),course=String(formData.get('course')||''),level=String(formData.get('level')||'');
           if(name.length<2)throw Error('Escriu un nom de com a mínim 2 caràcters.');
+          if(course!=='4t ESO')throw Error('De moment, EsoSa només deixa entrar alumnes de 4t d’ESO.');
+          if(!['A','B','C1','C2'].includes(level))throw Error('Tria el teu nivell de mitjana.')
           await account.create({userId:ID.unique(),email,password,name});
+          state.pendingCourse={course,level,email};
           state.tab='login';
           renderAuth();
           msg('Compte creat. Inicia sessió amb la mateixa contrasenya.',false);
@@ -263,22 +294,18 @@
   }
 
   async function home(){
-    activateSession();show('<div class="panel"><div class="eyebrow">Tauler personal</div><h1>Hola, '+escapeHTML(state.user?.name||'jugador')+'</h1><p class="sub">Aprèn les paraules dels apunts i puja posicions al rànquing.</p><div id="stats" class="score-row"><div class="scorebox"><strong>...</strong><small>Els teus punts</small></div></div><div id="pendingGames" class="stack" style="margin-bottom:16px" hidden></div><div class="stack"><button class="btn primary full" id="practice">PRACTICAR</button><button class="btn secondary full" id="ranking">RÀNQUING</button></div><button class="btn small history-entry" id="historyButton">Historial i domini</button><p class="hint" style="margin-top:22px">+10 punts per resposta correcta · −5 punts per error · 10.000 punts: EXAMEN DOMINADO</p><div id="feedback" hidden></div></div>');
+    activateSession();show('<div class="panel"><div class="eyebrow">Tauler personal</div><h1>Hola, '+escapeHTML(state.user?.name||'jugador')+'</h1><p class="sub">La teva puntuació i el rànquing continuen guardats a EsoSa.</p><div id="stats" class="score-row"><div class="scorebox"><strong>...</strong><small>Puntuació en Lèxic</small></div></div><div class="stack"><button class="btn primary full" id="practice">PRACTICAR</button><button class="btn secondary full" id="ranking">RÀNQUING</button></div><div id="feedback" hidden></div></div>');
     document.getElementById('practice').onclick=pickMode;
-    document.getElementById('ranking').onclick=ranking;
-    document.getElementById('historyButton').onclick=historyView;
-    loadPendingGames(viewVersion);
+    document.getElementById('ranking').onclick=chooseRanking;
     try{
       const p=await api({action:'me'});
       if(!document.getElementById('stats'))return;
-      document.getElementById('stats').innerHTML='<div class="scorebox"><strong>'+p.punts+'</strong><small>Punts acumulats</small></div><div class="scorebox"><strong>'+p.partides+'</strong><small>Partides</small></div><div class="scorebox"><strong>'+p.encerts+'</strong><small>Encerts</small></div>';
-      if(p.dominat){document.getElementById('stats').insertAdjacentHTML('beforebegin','<div class="banner">EXAMEN DOMINADO</div>');}
+      document.getElementById('stats').innerHTML='<div class="scorebox"><strong>'+p.punts+'</strong><small>Puntuació en Lèxic</small></div>';
     }catch(err){msg(errorMessage(err),true);}
   }
   function pickMode(){
-    show('<div class="panel"><div class="eyebrow">Pràctica</div><h1>Què vols estudiar?</h1><p class="sub">Si tens una partida pendent, es reprendrà automàticament. Cada resposta enviada queda desada.</p><div class="grid2"><section class="mode"><h3>LÈXIC</h3><p>Significats de totes les paraules dels lèxics 37–40, preguntes tipus test, escriptura i buits.</p><button class="btn primary" data-mode="lexic">JUGAR</button></section><section class="mode"><h3>DITES</h3><p>Significats, expressions equivalents i correcció de dites utilitzades amb un sentit inadequat.</p><button class="btn primary" data-mode="dites">JUGAR</button></section><section class="mode"><h3>CATANYOL</h3><p>Textos formats amb exemples dels apunts. Detecta i corregeix les construccions inadequades.</p><button class="btn primary" data-mode="catanyol">JUGAR</button></section><section class="mode"><h3>RECOMANACIÓ INFINITA</h3><p>Practica els teus errors sense límit. Les preguntes que més falles surten més sovint. Sense punts ni canvis al domini.</p><button class="btn secondary" data-mode="infinite">PRACTICAR ERRORS</button></section><section class="mode"><h3>MIX</h3><p>Lèxic, dites i catanyol en una mateixa partida, amb les preguntes barrejades.</p><button class="btn primary" data-mode="mix">JUGAR</button></section></div><div id="feedback" hidden></div><p style="margin-top:24px"><button class="btn" id="backHome">← Tornar</button></p></div>');
+    show('<div class="panel narrow"><div class="eyebrow">Continguts</div><h1>Estem preparant EsoSa</h1><p class="sub">Hem retirat els exercicis anteriors per començar una nova etapa. El primer bloc de continguts arribarà en el següent pas.</p><section class="mode"><h3>Lèxic</h3><p>La disciplina inclourà lèxic, dictats i català.</p></section><button class="btn full" id="backHome" style="margin-top:20px">← Tornar</button></div>');
     document.getElementById('backHome').onclick=home;
-    document.querySelectorAll('[data-mode]').forEach(btn=>btn.onclick=async()=>{if(state.busy)return;state.busy=true;btn.disabled=true;try{await openRun(btn.dataset.mode);}catch(err){msg(errorMessage(err),true);btn.disabled=false;}finally{state.busy=false;}});
   }
 
 
@@ -460,10 +487,14 @@
       }).join('');
     }catch(e){if(viewVersion===version)msg(errorMessage(e),true);}
   }
+  function chooseRanking(){
+    show('<div class="panel"><div class="eyebrow">Classificació</div><h1>Tria una disciplina</h1><p class="sub">Consulta els punts de cada matèria.</p><button class="mode full" id="lexicRanking"><h3>Lèxic</h3><p>Inclou lèxic, dictats i català.</p><span class="btn primary">VEURE PUNTUACIONS</span></button><button class="btn" id="backHome" style="margin-top:18px">← Tornar</button></div>');
+    document.getElementById('lexicRanking').onclick=()=>ranking();document.getElementById('backHome').onclick=home;
+  }
   async function ranking(refresh=false){
     refresh=refresh===true;
-    if(!refresh)show('<div class="panel"><div class="eyebrow">Classificació pública</div><h1>Rànquing de jugadors</h1><p class="sub">Jugadors ordenats de més punts a menys punts.</p><p class="presence-legend"><span><i class="presence-dot online" aria-hidden="true"></i> Connectat</span><span><i class="presence-dot playing" aria-hidden="true"></i> En partida</span></p><div id="list"><p>Carregant puntuacions...</p></div><button class="btn" id="backHome">← Tornar</button><div id="feedback" hidden></div></div>');
-    if(!refresh)document.getElementById('backHome').onclick=home;
+    if(!refresh)show('<div class="panel"><div class="eyebrow">Classificació pública · Lèxic</div><h1>Rànquing de Lèxic</h1><p class="sub">Inclou lèxic, dictats i català. La puntuació i les posicions anteriors es conserven.</p><p class="presence-legend"><span><i class="presence-dot online" aria-hidden="true"></i> Connectat</span><span><i class="presence-dot playing" aria-hidden="true"></i> En partida</span></p><div id="list"><p>Carregant puntuacions...</p></div><button class="btn secondary" id="chooseDiscipline">← Tria una altra disciplina</button><div id="feedback" hidden></div></div>');
+    if(!refresh)document.getElementById('chooseDiscipline').onclick=chooseRanking;
     try{
       const data=await api({action:'ranking'});
       if(!document.getElementById('list'))return;
