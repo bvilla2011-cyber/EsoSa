@@ -511,8 +511,8 @@
   }
   const examEvents={
     '2026-11-24':[{subject:'Socials',title:'Examen trimestral de la 1a avaluació',audience:'class',group:'C'}],
-    '2026-11-25':[{subject:'Anglès',title:'Examen trimestral',audience:'flexible',group:'B'}],
-    '2026-11-26':[{subject:'Català',title:'Examen trimestral de la 1a avaluació',audience:'flexible',group:'B'}],
+    '2026-11-25':[{subject:'Anglès',title:'Examen trimestral',audience:'flexible',group:''}],
+    '2026-11-26':[{subject:'Català',title:'Examen trimestral de la 1a avaluació',audience:'flexible',group:''}],
     '2026-11-27':[{subject:'Biologia i Geologia',title:'Examen trimestral de la 1a avaluació',audience:'class',group:''}],
     '2026-12-02':[{subject:'Matemàtiques',title:'Examen trimestral de la 1a avaluació',audience:'flexible',group:''}],
     '2026-12-03':[{subject:'Física i Química',title:'Examen del 1r trimestre',audience:'class',group:''}]
@@ -526,9 +526,9 @@
     const formatDate=d=>d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');
     const dayCards=Array.from({length:7},(_,i)=>{
       const d=new Date(monday);d.setDate(monday.getDate()+i);
-      const key=formatDate(d),prefs=state.user?.prefs||{},events=(examEvents[key]||[]).filter(e=>e.audience==='flexible'?(!e.group||e.group===prefs.level):e.audience==='class'?(!e.group||e.group===prefs.classGroup):true);
+      const key=formatDate(d),prefs=state.user?.prefs||{},events=(examEvents[key]||[]).filter(e=>e.audience==='flexible'?true:e.audience==='class'?(!e.group||e.group===prefs.classGroup):true);
       const status=d<today?'past':d.getTime()===today.getTime()?'today':'future';
-      return '<article class="calendar-day '+status+'"><div class="calendar-date"><span>'+days[i]+'</span><strong>'+d.getDate()+'</strong></div><div class="calendar-events">'+(events.length?events.map(e=>'<div class="calendar-event"><strong>'+escapeHTML(e.subject)+'</strong><span>'+escapeHTML(e.title)+'</span>'+(e.group?'<small>'+(e.audience==='flexible'?'Flexible ':'Grup classe ')+escapeHTML(e.group)+'</small>':'')+'</div>').join(''):'<span class="calendar-empty">—</span>')+'</div></article>';
+      return '<article class="calendar-day '+status+'"><div class="calendar-date"><span>'+days[i]+'</span><strong>'+d.getDate()+'</strong></div><div class="calendar-events">'+(events.length?events.map(e=>'<div class="calendar-event"><strong>'+escapeHTML(e.subject)+'</strong><span>'+escapeHTML(e.title)+'</span>'+(e.group?'<small>Grup classe '+escapeHTML(e.group)+'</small>':'')+'</div>').join(''):'<span class="calendar-empty">—</span>')+'</div></article>';
     }).join('');
     const sunday=new Date(monday);sunday.setDate(monday.getDate()+6);
     const period=monday.getDate()+' '+months[monday.getMonth()]+' – '+sunday.getDate()+' '+months[sunday.getMonth()]+' '+sunday.getFullYear();
