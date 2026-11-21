@@ -322,9 +322,8 @@
   function examPractice(id){
     const exam=upcomingExams.find(item=>item.id===id);if(!exam)return pickMode();
     if(id==='socials'){
-      show('<div class="panel"><div class="eyebrow">Socials · Temes 1 i 2</div><h1>Prepara l’examen de Socials</h1><p class="sub">Quatre formularis independents, del model A al D. Cada resposta correcta suma 10 punts al rànquing de Socials i cada error en resta 10. La nota de cada model és sobre 10 i les preguntes tenen pesos diferents.</p><div class="grid2"><section class="mode"><h3>Apunts · Tema 1</h3><a class="btn secondary full" href="./apunts-socials-tema-1.html" target="_blank" rel="noopener">OBRIR ELS APUNTS</a></section><section class="mode"><h3>Apunts · Tema 2</h3><a class="btn secondary full" href="./apunts-socials-tema-2.html" target="_blank" rel="noopener">OBRIR ELS APUNTS</a></section></div><h2>Models d’examen · Temes 1 i 2</h2><div class="grid2">'+['A','B','C','D'].map((m,i)=>'<section class="mode"><h3>Model '+m+'</h3><p>'+['Fonaments','Relacions i conceptes','Aplicació i anàlisi','Síntesi exigent'][i]+'</p><button class="btn primary full" data-social="'+m+'">OBRIR MODEL '+m+'</button></section>').join('')+'</div><button class="btn secondary full" id="socialRank" style="margin-top:18px">RÀNQUING DE SOCIALS</button><button class="btn full" id="backExams" style="margin-top:12px">← Tornar als exàmens</button></div>');
+      show('<div class="panel"><div class="eyebrow">Socials · Temes 1 i 2</div><h1>Prepara l’examen de Socials</h1><p class="sub">Quatre formularis independents, del model A al D. Cada resposta correcta suma 10 punts al rànquing de Socials i cada error en resta 10. La nota de cada model és sobre 10 i les preguntes tenen pesos diferents.</p><div class="grid2"><section class="mode"><h3>Apunts · Tema 1</h3><a class="btn secondary full" href="./apunts-socials-tema-1.html" target="_blank" rel="noopener">OBRIR ELS APUNTS</a></section><section class="mode"><h3>Apunts · Tema 2</h3><a class="btn secondary full" href="./apunts-socials-tema-2.html" target="_blank" rel="noopener">OBRIR ELS APUNTS</a></section></div><h2>Models d’examen · Temes 1 i 2</h2><div class="grid2">'+['A','B','C','D'].map((m,i)=>'<section class="mode"><h3>Model '+m+'</h3><p>'+['Fonaments','Relacions i conceptes','Aplicació i anàlisi','Síntesi exigent'][i]+'</p><button class="btn primary full" data-social="'+m+'">OBRIR MODEL '+m+'</button></section>').join('')+'</div><button class="btn full" id="backExams" style="margin-top:12px">← Tornar als exàmens</button></div>');
       document.querySelectorAll('[data-social]').forEach(b=>b.onclick=()=>socialExam(b.dataset.social));
-      document.getElementById('socialRank').onclick=()=>rankingSocial();
       document.getElementById('backExams').onclick=pickMode;
       return;
     }
@@ -536,8 +535,9 @@
     }catch(e){if(viewVersion===version)msg(errorMessage(e),true);}
   }
   function chooseRanking(){
-    show('<div class="panel"><div class="eyebrow">Classificació</div><h1>Tria una disciplina</h1><p class="sub">Consulta els punts de cada matèria.</p><button class="mode full" id="lexicRanking"><h3>Lèxic · primer trimestre</h3><p>Inclou lèxic, dictats i català.</p><span class="btn primary">VEURE PUNTUACIONS</span></button><button class="btn" id="backHome" style="margin-top:18px">← Tornar</button></div>');
+    show('<div class="panel"><div class="eyebrow">Classificació</div><h1>Tria una disciplina</h1><p class="sub">Consulta els punts de cada matèria.</p><div class="grid2"><button class="mode full" id="lexicRanking"><h3>Lèxic · primer trimestre</h3><p>Inclou lèxic, dictats i català.</p><span class="btn primary">VEURE PUNTUACIONS</span></button><button class="mode full" id="socialRankingMenu"><h3>Socials</h3><p>+10 per encert · −10 per error.</p><span class="btn primary">VEURE PUNTUACIONS</span></button></div><button class="btn" id="backHome" style="margin-top:18px">← Tornar</button></div>');
     document.getElementById('lexicRanking').onclick=()=>ranking();document.getElementById('backHome').onclick=home;
+    document.getElementById('socialRankingMenu').onclick=()=>rankingSocial();
   }
   const examEvents={
     '2026-11-24':[{subject:'Socials',title:'Examen trimestral de la 1a avaluació',audience:'class',group:'C'}],
