@@ -2,6 +2,7 @@ import { Client, TablesDB, Users, ID, Query } from 'node-appwrite';
 import { opcionsDificils } from '../../src/distractors.js';
 import { createHash } from 'node:crypto';
 import { LEXIC, DITES, CATANYOL } from '../../src/banc.js';
+import { questions as socialQuestions } from '../../socials.js';
 
 const BUITS=[];
 
@@ -140,6 +141,27 @@ export default async ({req,res,error})=>{
     if(!data||typeof data!=='object'||Array.isArray(data))return {};
     return Object.fromEntries(Object.entries(data).filter(([k,v])=>v&&Number.isFinite(v.at)&&Date.now()-v.at<75000).slice(-12));
   };
+  if(action==='socialFinish'){
+    const model=String(body.model||''),qs=socialQuestions(model),answers=body.answers,attempt=String(body.attempt||'');
+    if(!qs.length||!Array.isArray(answers)||answers.length!==qs.length||!/^[a-f0-9-]{36}$/.test(attempt)||answers.some((x,i)=>!Number.isInteger(x)||x<0||x>=qs[i].options.length))return res.json({error:'Respostes o model no vàlids.'},400);
+    const resultats=qs.map((q,i)=>answers[i]===q.correct);
+    const correctes=resultats.filter(Boolean).length,errors=qs.length-correctes,punts=(correctes-errors)*10;
+    const total=qs.reduce((n,q)=>n+q.weight,0),nota=Math.round(resultats.reduce((n,ok,i)=>n+(ok?qs[i].weight:0),0)*100/total)/10;
+    try{await tables.createRow({databaseId:DB,tableId:'social_attempts',rowId:attempt,data:{usuari:userId,model,nota,punts}});}
+    catch(e){if(e.code===409)return res.json({error:'Aquest examen ja s’ha lliurat. Torna als models per iniciar-ne un de nou.'},409);throw e;}
+    return res.json({nota,correctes,errors,punts,resultats});
+  }
+  if(action==='socialRanking'){
+    const totals=new Map();let cursor=null;
+    do{
+      const queries=[Query.orderAsc('$id'),Query.limit(100)];if(cursor)queries.push(Query.cursorAfter(cursor));
+      const result=await tables.listRows({databaseId:DB,tableId:'social_attempts',queries});const rows=result.rows||result.documents||[];
+      for(const row of rows){const old=totals.get(row.usuari)||{punts:0,partides:0};old.punts+=row.punts;old.partides++;totals.set(row.usuari,old);}
+      cursor=rows.length===100?rows[rows.length-1].$id:null;
+    }while(cursor);
+    const ranking=await Promise.all([...totals.entries()].map(async ([id,data])=>{let nom='Jugador';try{nom=(await read(PERFILS,id)).nom;}catch{}return {id,nom,...data};}));
+    ranking.sort((a,b)=>b.punts-a.punts||a.nom.localeCompare(b.nom));return res.json({ranking:ranking.slice(0,100)});
+  }
   if(!['presence','me','ranking'].includes(action))
     return res.json({error:'Els nous continguts de EsoSa arribaran aviat.'},503);
   if(action==='presence'){
