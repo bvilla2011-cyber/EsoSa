@@ -3,108 +3,7 @@ import { opcionsDificils } from '../../src/distractors.js';
 import { createHash } from 'node:crypto';
 import { LEXIC, DITES, CATANYOL } from '../../src/banc.js';
 
-const BUITS=[
-  [
-    "El petard ha ___ amb un soroll fort després d'encendre'l.",
-    "esclatat",
-    "El petard ha ___."
-  ],
-  [
-    "Després de dutxar-me amb aigua calenta, el mirall s'ha ___ completament.",
-    "entelat",
-    "El mirall s'ha ___."
-  ],
-  [
-    "La primera edició del llibre s'ha ___: no queden exemplars disponibles.",
-    "exhaurit",
-    "La primera edició del llibre ja s'ha ___."
-  ],
-  [
-    "Amb la pluja, la barana de ferro s'ha ___, formant òxid.",
-    "rovellat",
-    "La barana de ferro s'ha ___."
-  ],
-  [
-    "En acabar l'obra, han ___ la grua, separant-ne totes les peces.",
-    "desmuntat",
-    "Han acabat l'edifici i han ___ la grua."
-  ],
-  [
-    "Cal ___ la paret amb puntals perquè no caigui sobre nosaltres.",
-    "apuntalar",
-    "___ una paret perquè no caigui."
-  ],
-  [
-    "No has d'___ aquesta notícia: encara és secreta i ningú ho sap.",
-    "escampar",
-    "___ una notícia."
-  ],
-  [
-    "Vull ___ un amic perquè prengui una bona decisió sobre estudis.",
-    "aconsellar",
-    "___ un amic."
-  ],
-  [
-    "Va decidir ___ en un projecte complicat que comportava molts problemes.",
-    "embrancar-se",
-    "___ en un projecte complicat."
-  ],
-  [
-    "Cal ___ el full per la meitat, ajuntant les dues vores.",
-    "doblegar",
-    "___ un full per fer un avió de paper."
-  ],
-  [
-    "Hem de ___ aquestes maletes pesants d'una terminal a l'altra.",
-    "traginar",
-    "___ les maletes per tot l'aeroport."
-  ],
-  [
-    "Cal ___ el vi de l'ampolla a la copa sense vessar-lo.",
-    "abocar",
-    "___ el vi en una copa."
-  ],
-  [
-    "Has de ___ el pernil amb un ganivet per obtenir-ne llesques.",
-    "tallar",
-    "___ el pernil amb un ganivet."
-  ],
-  [
-    "Cal ___ el cinturó perquè els pantalons no em quedin fluixos.",
-    "estrènyer",
-    "___ un cinturó."
-  ],
-  [
-    "Cal ___ el cargol amb el tornavís fins que quedi fix.",
-    "cargolar",
-    "___ un vis."
-  ],
-  [
-    "No sentim la ràdio: cal ___ el volum perquè soni més fort.",
-    "apujar",
-    "___ el so d'un aparell."
-  ],
-  [
-    "Volen ___ l'autopista afegint-hi un carril perquè hi circulin més vehicles.",
-    "eixamplar",
-    "___ una autopista a tres carrils."
-  ],
-  [
-    "Cal ___ el llibre amb plàstic per protegir-ne les cobertes.",
-    "folrar",
-    "___ un llibre per protegir-lo."
-  ],
-  [
-    "Va ___ tota la roba al calaix, amuntegada i sense ordre.",
-    "entaforar",
-    "___ la roba al calaix de qualsevol manera."
-  ],
-  [
-    "Cal ___ l'ampolla: no hi ha de quedar gens de líquid.",
-    "buidar",
-    "___ una ampolla abans de llençar-la al contenidor."
-  ]
-];
+const BUITS=[];
 
 const DB='lexico4t', PERFILS='perfils', PARTIDES='partides';
 const barreja=(items)=>{const a=[...items];for(let i=a.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[a[i],a[j]]=[a[j],a[i]];}return a;};
@@ -194,6 +93,8 @@ export default async ({req,res,error})=>{
   const sessClient=new Client().setEndpoint(process.env.APPWRITE_FUNCTION_API_ENDPOINT||'https://fra.cloud.appwrite.io/v1').setProject(process.env.APPWRITE_FUNCTION_PROJECT_ID).setJWT(jwt);
   const me=await new (await import('node-appwrite')).Account(sessClient).get();
   if(me.$id!==userId) return res.json({error:'Sessió no vàlida.'},401);
+  if(me.prefs?.course!=='4t ESO'||!['A','B','C1','C2'].includes(me.prefs?.level))
+    return res.json({error:'Cal confirmar que ets de 4t d’ESO i indicar el teu nivell.'},403);
   const read=async (table,rowId)=>tables.getRow({databaseId:DB,tableId:table,rowId});
   const write=async (table,rowId,data)=>tables.updateRow({databaseId:DB,tableId:table,rowId,data});
   const inicial=()=>({nom:String(me.name||'Jugador').slice(0,80),punts:0,partides:0,encerts:0,errors:0});
@@ -239,6 +140,8 @@ export default async ({req,res,error})=>{
     if(!data||typeof data!=='object'||Array.isArray(data))return {};
     return Object.fromEntries(Object.entries(data).filter(([k,v])=>v&&Number.isFinite(v.at)&&Date.now()-v.at<75000).slice(-12));
   };
+  if(!['presence','me','ranking'].includes(action))
+    return res.json({error:'Els nous continguts de EsoSa arribaran aviat.'},503);
   if(action==='presence'){
     const tab=String(body.tab||'');
     if(!/^[a-zA-Z0-9-]{8,64}$/.test(tab)||!['online','playing','offline'].includes(body.status))
