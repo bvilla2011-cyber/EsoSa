@@ -98,9 +98,11 @@ export default async ({req,res,error})=>{
     return res.json({error:'Cal confirmar que ets de 4t d’ESO i indicar el nivell flexible i el grup classe.'},403);
   const read=async (table,rowId)=>tables.getRow({databaseId:DB,tableId:table,rowId});
   const write=async (table,rowId,data)=>tables.updateRow({databaseId:DB,tableId:table,rowId,data});
-  const inicial=()=>({nom:String(me.name||'Jugador').slice(0,80),punts:0,partides:0,encerts:0,errors:0});
+  const nomCorreu=(email,fallback='Jugador')=>String(email||'').split('@')[0].trim().slice(0,80)||String(fallback||'Jugador').slice(0,80);
+  const nomUsuari=async(id,fallback)=>{try{const u=await users.get(id);return nomCorreu(u.email,fallback);}catch{return fallback||'Jugador';}};
+  const inicial=()=>({nom:nomCorreu(me.email,me.name),punts:0,partides:0,encerts:0,errors:0});
   const perfil=async()=>{
-    try{return await read(PERFILS,userId);}
+    try{const p=await read(PERFILS,userId),nom=nomCorreu(me.email,me.name);if(p.nom!==nom)return await write(PERFILS,userId,{nom});return p;}
     catch(e){if(e.code!==404)throw e;try{return await tables.createRow({databaseId:DB,tableId:PERFILS,rowId:userId,data:inicial()});}catch(x){if(x.code===409)return read(PERFILS,userId);throw x;}}
   };
   // Desa una partida sencera o interrompuda en una única transacció atòmica.
@@ -159,7 +161,7 @@ export default async ({req,res,error})=>{
       for(const row of rows){const old=totals.get(row.usuari)||{punts:0,partides:0};old.punts+=row.punts;old.partides++;totals.set(row.usuari,old);}
       cursor=rows.length===100?rows[rows.length-1].$id:null;
     }while(cursor);
-    const ranking=await Promise.all([...totals.entries()].map(async ([id,data])=>{let nom='Jugador';try{nom=(await read(PERFILS,id)).nom;}catch{}return {id,nom,...data};}));
+    const ranking=await Promise.all([...totals.entries()].map(async ([id,data])=>{let nom='Jugador';try{nom=await nomUsuari(id,(await read(PERFILS,id)).nom);}catch{}return {id,nom,...data};}));
     ranking.sort((a,b)=>b.punts-a.punts||a.nom.localeCompare(b.nom));return res.json({ranking:ranking.slice(0,100)});
   }
   if(!['presence','me','ranking'].includes(action))
@@ -180,7 +182,8 @@ export default async ({req,res,error})=>{
   }
   if(action==='ranking'){
     const r=await tables.listRows({databaseId:DB,tableId:PERFILS,queries:[Query.orderDesc('punts'),Query.limit(100)]});
-    return res.json({ranking:(r.rows||r.documents||[]).map((x,i)=>({id:x.$id,posicio:i+1,nom:x.nom,punts:x.punts,partides:x.partides,presencia:Object.values(presenceMap(x.presencia)).some(v=>v.status==='playing')?'playing':Object.keys(presenceMap(x.presencia)).length?'online':null}))});
+    const ranking=await Promise.all((r.rows||r.documents||[]).map(async (x,i)=>({id:x.$id,posicio:i+1,nom:await nomUsuari(x.$id,x.nom),punts:x.punts,partides:x.partides,presencia:Object.values(presenceMap(x.presencia)).some(v=>v.status==='playing')?'playing':Object.keys(presenceMap(x.presencia)).length?'online':null})));
+    return res.json({ranking});
   }
 
   if(action==='recommendations'){
