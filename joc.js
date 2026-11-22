@@ -296,7 +296,7 @@
   }
 
   async function home(){
-    activateSession();show('<div class="panel"><div class="eyebrow">Tauler personal</div><h1>Hola, '+escapeHTML(state.user?.name||'jugador')+'</h1><p class="sub">La teva puntuació i el rànquing continuen guardats a EsoSa.</p><div id="stats" class="score-row"><div class="scorebox"><strong>...</strong><small>Puntuació en Lèxic · primer trimestre</small></div></div><div class="grid2"><button class="btn primary full" id="practice">PRACTICAR</button><button class="btn secondary full" id="ranking">RÀNQUING</button><button class="btn full" id="calendar">CALENDARI</button><button class="btn full" id="socialRankingHome">RÀNQUING DE SOCIALS</button></div><div id="feedback" hidden></div></div>');
+    activateSession();show('<div class="panel"><div class="eyebrow">Tauler personal</div><h1>Hola, '+escapeHTML(state.user?.name||'jugador')+'</h1><p class="sub">La teva puntuació i el rànquing continuen guardats a EsoSa.</p><div id="stats" class="score-row"><div class="scorebox"><strong>...</strong><small>Puntuació en Lèxic · primer trimestre</small></div></div><div class="grid2"><button class="btn primary full" id="practice">PRACTICAR</button><button class="btn secondary full" id="ranking">RÀNQUING</button><button class="btn full" id="calendar">CALENDARI</button><button class="btn full" id="socialRankingHome">RÀNQUING DE SOCIALS</button><a class="btn full" href="./esquema-socials.html?v=20261122" target="_blank" rel="noopener">ESQUEMA DE SOCIALS</a></div><div id="feedback" hidden></div></div>');
     document.getElementById('practice').onclick=pickMode;
     document.getElementById('ranking').onclick=chooseRanking;
     document.getElementById('socialRankingHome').onclick=rankingSocial;
