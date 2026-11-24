@@ -122,8 +122,15 @@ Total output lines: 640
     });
   }
   async function api(body){
-    const r=await functions.createExecution({functionId:'motor',body:JSON.stringify(body),async:false,method:'POST'});
-    if(r.status==='failed')throw Error('La funció del servidor ha fallat.');
+    const retryable=['answer','leave','englishAnswer'].includes(body?.action);
+    let r;
+    for(let attempt=0;;attempt++){
+      try{r=await functions.createExecution({functionId:'motor',body:JSON.stringify(body),async:false,method:'POST'});}
+      catch(e){if(retryable&&attempt===0&&(!e?.code||e.code>=500)){await new Promise(resolve=>setTimeout(resolve,350));continue;}throw e;}
+      if((r.status==='failed'||r.responseStatusCode>=502)&&retryable&&attempt===0){await new Promise(resolve=>setTimeout(resolve,350));continue;}
+      break;
+    }
+    if(r.status==='failed')throw Object.assign(Error('El servidor no ha pogut desar la resposta. Torna-ho a provar; no es repetiran els punts.'),{code:r.responseStatusCode||503});
     let data={};try{data=JSON.parse(r.responseBody||'{}')}catch{throw Error('Resposta no vàlida del servidor.')}
     if(data.error||r.responseStatusCode>=400)throw Object.assign(Error(data.error||'Error del servidor.'),{code:r.responseStatusCode});
     if(!r.responseBody)throw Error('El servidor no ha retornat dades. Torna-ho a provar.');
@@ -364,7 +371,9 @@ Total output lines: 640
     document.getElementById('englishAnswer').onsubmit=async e=>{
       e.preventDefault();if(r.busy)return;r.busy=true;const answer=new FormData(e.currentTarget).get('answer');const btn=document.getElementById('sendEnglish');btn.disabled=true;
       try{
-        const result=await api({action:'englishAnswer',session:r.session,index:r.index,answer:String(answer)});
+        r.pendingRequestId=r.pendingRequestId||crypto.randomUUID();
+        const result=await api({action:'englishAnswer',session:r.session,index:r.index,requestId:r.pendingRequestId,answer:String(answer)});
+        r.pendingRequestId=null;
         r.points=result.points;r.index=result.index;r.correct+=result.correct?1:0;r.wrong+=result.correct?0:1;
         const box=document.getElementById('feedback');box.hidden=false;box.className='message '+(result.correct?'ok':'error');box.textContent=result.correct?'Correcte! +10 punts':'Incorrecte. Resposta correcta: '+result.solution+' · −10 punts';
         if(result.finished){r.index=r.order.length;setTimeout(renderEnglishQuestion,1100);}else setTimeout(renderEnglishQuestion,1300);
