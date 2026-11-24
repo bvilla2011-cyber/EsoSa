@@ -1,6 +1,3 @@
-Warning: truncated output (original token count: 14262)
-Total output lines: 640
-
 // Joc interactiu de català — interfície sense animacions.
 (() => {
   'use strict';
@@ -362,10 +359,17 @@ Total output lines: 640
     const r=englishRun;
     if(r.index>=r.order.length){
       const grade=Math.round(r.correct/r.order.length*100)/10;
-      show('<div class="panel narrow center"><div class="eyebrow">Vocabulary · Anglès</div><h1>Quiz completat</h1><p class="sub">Has acabat les 55 preguntes.</p><div class="score-row" style="justify-content:center"><div class="scorebo…262 tokens truncated…'+v[3].replace('___','_____')+'”';correct=v[4];}
+      show('<div class="panel narrow center"><div class="eyebrow">Vocabulary · Anglès</div><h1>Quiz completat</h1><p class="sub">Has acabat les 55 preguntes.</p><div class="score-row" style="justify-content:center"><div class="scorebox"><strong>'+grade.toLocaleString('ca-ES')+' / 10</strong><small>Nota</small></div><div class="scorebox"><strong>'+r.points.toLocaleString('ca-ES')+'</strong><small>Punts acumulats d’Anglès</small></div><div class="scorebox"><strong>'+r.correct+' / '+r.order.length+'</strong><small>Encerts</small></div></div><p class="hint">Resultat guardat al rànquing d’Anglès i als punts totals del compte.</p><button class="btn primary full" id="againEnglish">Tornar a practicar</button><button class="btn secondary full" id="englishRank" style="margin-top:10px">Rànquing d’Anglès</button></div>');
+      document.getElementById('againEnglish').onclick=startEnglishQuiz;document.getElementById('englishRank').onclick=()=>englishRanking();return;
+    }
+    const item=r.order[r.index],v=r.vocab.find(x=>x[0]===item.id);let prompt,correct;
+    if(item.kind==='en-es'){prompt='Què vol dir «'+v[1]+'»?';correct=v[2];}
+    else if(item.kind==='es-en'){prompt='Com es diu en anglès: «'+v[2]+'»?';correct=v[1];}
+    else{prompt='Completa la frase: “'+v[3].replace('___','_____')+'”';correct=v[4];}
     const pool=item.kind==='en-es'?r.vocab.map(x=>x[2]):r.vocab.map(x=>x[1]);
     const options=shuffleItems([correct,...shuffleItems([...new Set(pool.filter(x=>x!==correct))]).slice(0,3)]);
-    const category=v[0].startsWith('data')||['break-through','file-names','screenshot','spreadsheet','upgrade','bookmark','bug','crash','run','network','icon','browse'].includes(v[0])?'Technology':v[0].includes('plug')||v[0].includes('steam')||v[0].includes('sharpest')||v[0].includes('cutting')||v[0].includes('test')||v[0].includes('rocket')||v[0].includes('wires')||v[0].includes('fuse')||v[0].includes('bulb')?'Idioms':v[0]==='peel'||v[0]==='blend'||v[0]==='chop'||v[0]==='dice'||v[0]==='marinate'||v[0]==='season'||v[0]==='saute'||v[0]==='thaw'||v[0]==='preserve'||v[0]==='ripen'||v[0]==='waste'||v[0]==='go-off'?'Cooking':'Food';
+    const vocabIndex=r.vocab.indexOf(v);
+    const category=vocabIndex<13?'Technology':vocabIndex<22?'Idioms':vocabIndex<43?'Food':'Cooking';
     show('<div class="panel"><div class="eyebrow">'+category+' · Question '+(r.index+1)+' / '+r.order.length+'</div><div class="bar"><h1>Vocabulary</h1><strong>'+r.points+' punts</strong></div><div class="progress"><div style="width:'+((r.index)/r.order.length*100)+'%"></div></div><h2 class="question">'+escapeHTML(prompt)+'</h2><form id="englishAnswer" class="stack">'+options.map(x=>'<label class="option"><input type="radio" name="answer" value="'+escapeHTML(x)+'" required><span>'+escapeHTML(x)+'</span></label>').join('')+'<button class="btn primary full" id="sendEnglish">RESPONDRE</button><div id="feedback" hidden></div></form><p class="hint">+10 punts per encert · −10 punts per error</p><button class="btn link" id="exitEnglish">Sortir</button></div>');
     document.getElementById('exitEnglish').onclick=()=>{englishRun=null;examPractice('angles');};
     document.getElementById('englishAnswer').onsubmit=async e=>{
@@ -380,7 +384,6 @@ Total output lines: 640
       }catch(err){r.busy=false;btn.disabled=false;msg(errorMessage(err),true);}
     };
   }
-
 
   const practice={pool:[],count:0,last:null};
   const practiceNormalize=s=>String(s??'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLocaleLowerCase('ca').replace(/[‘’´]/g,"'").replace(/[^a-z0-9çñ·' ]/g,' ').replace(/\s+/g,' ').trim();
