@@ -1,3 +1,6 @@
+Warning: truncated output (original token count: 14262)
+Total output lines: 640
+
 // Joc interactiu de català — interfície sense animacions.
 (() => {
   'use strict';
@@ -92,7 +95,7 @@
   }
   setInterval(()=>{
     sendPresence();
-    if(state.user&&document.getElementById('list'))ranking(true);
+    if(state.user&&document.getElementById('list')&&document.getElementById('list').dataset.discipline!=='english')ranking(true);
   },25000);
   window.addEventListener('pagehide',()=>{sendPresence('offline');});
   window.addEventListener('pageshow',()=>{lastPresenceAt=0;sendPresence();});
@@ -296,14 +299,14 @@
   }
 
   async function home(){
-    activateSession();show('<div class="panel"><div class="eyebrow">Tauler personal</div><h1>Hola, '+escapeHTML(state.user?.name||'jugador')+'</h1><p class="sub">La teva puntuació i el rànquing continuen guardats a EsoSa.</p><div id="stats" class="score-row"><div class="scorebox"><strong>...</strong><small>Puntuació en Lèxic · primer trimestre</small></div></div><div class="grid2"><button class="btn primary full" id="practice">PRACTICAR</button><button class="btn secondary full" id="ranking">RÀNQUING</button><button class="btn full" id="calendar">CALENDARI</button></div><div id="feedback" hidden></div></div>');
+    activateSession();show('<div class="panel"><div class="eyebrow">Tauler personal</div><h1>Hola, '+escapeHTML(state.user?.name||'jugador')+'</h1><p class="sub">La puntuació total suma els punts de totes les disciplines.</p><div id="stats" class="score-row"><div class="scorebox"><strong>...</strong><small>Punts totals del compte</small></div></div><div class="grid2"><button class="btn primary full" id="practice">PRACTICAR</button><button class="btn secondary full" id="ranking">RÀNQUING</button><button class="btn full" id="calendar">CALENDARI</button></div><div id="feedback" hidden></div></div>');
     document.getElementById('practice').onclick=pickMode;
     document.getElementById('ranking').onclick=chooseRanking;
     document.getElementById('calendar').onclick=calendarView;
     try{
       const p=await api({action:'me'});
       if(!document.getElementById('stats'))return;
-      document.getElementById('stats').innerHTML='<div class="scorebox"><strong>'+p.punts+'</strong><small>Puntuació en Lèxic · primer trimestre</small></div>';
+      document.getElementById('stats').innerHTML='<div class="scorebox"><strong>'+Number(p.puntsTotals??p.punts).toLocaleString("ca-ES")+'</strong><small>Punts totals del compte</small></div>';
     }catch(err){msg(errorMessage(err),true);}
   }
   const upcomingExams=[
@@ -321,9 +324,13 @@
   }
   function examPractice(id){
     const exam=upcomingExams.find(item=>item.id===id);if(!exam)return pickMode();
+    if(id==='angles'){
+      show('<div class="panel"><div class="eyebrow">Trimestral d’anglès</div><h1>Vocabulary – Trimestral d’anglès</h1><p class="sub">Un únic quiz amb les 55 paraules i expressions de tecnologia, idioms, menjar i cuina. L’ordre canvia a cada intent.</p><section class="mode"><h3>Quiz complet · 55 preguntes</h3><p>Combina traduccions i frases per completar. +10 per encert, −10 per error. Cada resposta s’afegeix al rànquing d’Anglès.</p><button class="btn primary full" id="startEnglish">COMENÇAR QUIZ</button></section><button class="btn full" id="backExams" style="margin-top:20px">← Tornar als exàmens</button></div>');
+      document.getElementById('startEnglish').onclick=startEnglishQuiz;document.getElementById('backExams').onclick=pickMode;return;
+    }
     if(id==='socials'){
-    show('<div class="panel"><div class="eyebrow">Socials · Temes 1 i 2</div><h1>Prepara l’examen de Socials</h1><p class="sub">Quatre formularis independents, del model A al D. Cada resposta correcta suma 10 punts al rànquing de Socials i cada error en resta 10. La nota de cada model és sobre 10 i les preguntes tenen pesos diferents.</p><div class="grid2"><section class="mode"><h3>Apunts · Tema 1</h3><a class="btn secondary full" href="./apunts-socials-tema-1.html" target="_blank" rel="noopener">OBRIR ELS APUNTS</a></section><section class="mode"><h3>Apunts · Tema 2</h3><a class="btn secondary full" href="./apunts-socials-tema-2.html" target="_blank" rel="noopener">OBRIR ELS APUNTS</a></section><section class="mode"><h3>Esquema interactiu</h3><a class="btn secondary full" href="./esquema-socials.html?v=20261122" target="_blank" rel="noopener">OBRIR L’ESQUEMA</a></section></div><h2>Models d’examen · Temes 1 i 2</h2><div class="grid2">'+['A','B','C','D'].map((m,i)=>'<section class="mode"><h3>Model '+m+'</h3><p>'+['Fonaments','Relacions i conceptes','Aplicació i anàlisi','Síntesi exigent'][i]+'</p><button class="btn primary full" data-social="'+m+'">OBRIR MODEL '+m+'</button></section>').join('')+'</div><button class="btn full" id="backExams" style="margin-top:12px">← Tornar als exàmens</button></div>');
-      document.querySelectorAll('[data-social]').forEach(b=>b.onclick=()=>socialExam(b.dataset.social));
+      const models=[['Model A · Causes i inici',1],['Model B · Constitució i faccions',2],['Model C · Guerra, República i Terror',3],['Model D · Síntesi i llegat',4]];
+      show('<div class="panel"><div class="eyebrow">Socials · Tema 2</div><h1>Revolució Francesa</h1><p class="sub">Estudia els apunts i practica amb models d’examen diferents. Les dates secundàries no són l’objectiu: prioritzem les que el dossier destaca.</p><div class="grid2"><section class="mode"><h3>Apunts · Tema 2</h3><p>Els nou moments, conceptes clau i les deu dates prioritàries.</p><a class="btn secondary full" href="./apunts-socials-tema-2.html" target="_blank" rel="noopener">OBRIR ELS APUNTS</a></section><section class="mode"><h3>Practicar examen</h3><p>Quatre models en PDF amb formats diferents. El solucionari és al final.</p><a class="btn primary full" href="./examen-socials-tema-2.pdf" target="_blank" rel="noopener">OBRIR EL PDF D’EXÀMENS</a></section></div><h2 style="margin-top:24px">Tria un model</h2><div class="grid2">'+models.map(([name,page])=>'<a class="mode" href="./examen-socials-tema-2.pdf#page='+page+'" target="_blank" rel="noopener"><h3>'+name+'</h3><p>Obre directament aquest model en el PDF.</p><span class="btn full">OBRIR MODEL</span></a>').join('')+'</div><button class="btn full" id="backExams" style="margin-top:20px">← Tornar als exàmens</button></div>');
       document.getElementById('backExams').onclick=pickMode;
       return;
     }
@@ -332,27 +339,37 @@
     document.getElementById('backExams').onclick=pickMode;
   }
 
-  async function socialExam(model){
-    const {questions}=await import('./socials.js');
-    const qs=questions(model),attempt=crypto.randomUUID();
-    show('<div class="panel"><div class="eyebrow">Socials · Temes 1 i 2</div><h1>Model '+model+'</h1><p class="sub">Respon totes les preguntes. La nota pondera els exercicis; els punts del rànquing són +10 o −10 per resposta.</p><form id="socialForm" class="stack">'+qs.map((q,i)=>'<fieldset class="social-question"><legend><strong>'+(i+1)+'. '+escapeHTML(q.text)+'</strong> <small>Pes '+q.weight+'</small></legend>'+q.options.map((option,j)=>'<label class="social-option"><input type="radio" name="'+q.id+'" value="'+j+'" required> '+escapeHTML(option)+'</label>').join('')+'</fieldset>').join('')+'<button class="btn primary full" id="socialSubmit">LLIURAR EXAMEN</button><div id="feedback" hidden></div></form><button class="btn full" id="socialBack">← Tornar als models</button></div>');
-    document.getElementById('socialBack').onclick=()=>examPractice('socials');
-    document.getElementById('socialForm').onsubmit=async e=>{
-      e.preventDefault();if(state.busy)return;
-      const answers=qs.map(q=>Number(new FormData(e.currentTarget).get(q.id)));
-      state.busy=true;document.getElementById('socialSubmit').disabled=true;
-      try{
-        const result=await api({action:'socialFinish',model,attempt,answers});
-        show('<div class="panel"><div class="eyebrow">Socials · Model '+model+'</div><h1>Nota: '+result.nota.toLocaleString('ca-ES')+' / 10</h1><p class="sub">'+result.correctes+' encerts · '+result.errors+' errors · '+(result.punts>=0?'+':'')+result.punts+' punts al rànquing de Socials.</p>'+qs.map((q,i)=>'<section class="mode"><strong>'+(i+1)+'. '+escapeHTML(q.text)+'</strong><p>'+ (result.resultats[i]?'✓ Correcte':'✗ Resposta correcta: '+escapeHTML(q.options[q.correct]))+'</p></section>').join('')+'<button class="btn primary full" id="socialModels">TORNAR ALS MODELS</button></div>');
-        document.getElementById('socialModels').onclick=()=>examPractice('socials');
-      }catch(err){msg(errorMessage(err),true);document.getElementById('socialSubmit').disabled=false;}
-      finally{state.busy=false;}
-    };
+  let englishRun=null;
+  const shuffleItems=a=>{const x=[...a];for(let i=x.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[x[i],x[j]]=[x[j],x[i]];}return x;};
+  async function startEnglishQuiz(){
+    try{
+      const {ENGLISH_VOCAB}=await import('./src/english-vocab.js');
+      const order=shuffleItems(ENGLISH_VOCAB).map(v=>({id:v[0],kind:['en-es','es-en','sentence'][Math.floor(Math.random()*3)]}));
+      const started=await api({action:'englishStart',order});
+      englishRun={vocab:ENGLISH_VOCAB,order,session:started.session,index:0,points:started.points,correct:0,wrong:0,busy:false};
+      renderEnglishQuestion();
+    }catch(e){show('<div class="panel"><h1>No s’ha pogut començar</h1><p class="sub">'+escapeHTML(errorMessage(e))+'</p><button class="btn" id="englishBack">Tornar</button></div>');document.getElementById('englishBack').onclick=()=>examPractice('angles');}
   }
-  async function rankingSocial(){
-    show('<div class="panel"><div class="eyebrow">Classificació pública · Socials</div><h1>Rànquing de Socials</h1><p class="sub">Puntuació acumulada dels models d’examen. +10 per encert · −10 per error.</p><p class="presence-legend"><span><i class="presence-dot online" aria-hidden="true"></i> Connectat</span><span><i class="presence-dot playing" aria-hidden="true"></i> En partida</span></p><div id="socialList"><p>Carregant puntuacions...</p></div><button class="btn secondary" id="socialReturn">← Tria una altra disciplina</button><div id="feedback" hidden></div></div>');
-    document.getElementById('socialReturn').onclick=chooseRanking;
-    try{const r=await api({action:'socialRanking'});const box=document.getElementById('socialList');if(!box)return;const players=r.ranking,fmt=n=>Number(n||0).toLocaleString('ca-ES'),ordinal=n=>n===1?'1r':n===2?'2n':n===3?'3r':n===4?'4t':n+'è',medals=['🥇','🥈','🥉'],titles=['Primer','Segon','Tercer'],podium=players.slice(0,3).map((p,i)=>'<article class="podium-card podium-'+i+'"><span class="podium-medal" aria-hidden="true">'+medals[i]+'</span><span class="podium-place">'+titles[i]+'</span><strong class="podium-name">'+escapeHTML(p.nom)+presenceDot(p)+'</strong><span class="podium-points">'+fmt(p.punts)+' <small>punts</small></span></article>').join('');box.innerHTML=players.length?'<div class="rank-podium" aria-label="Podi del rànquing">'+podium+'</div><div class="rank-caption"><span>Classificació · '+players.length+' jugadors</span><span>+10 per encert · −10 per error</span></div><table class="ranking ranking-fresh"><thead><tr><th scope="col">Posició</th><th scope="col">Jugador</th><th scope="col">Punts</th></tr></thead><tbody>'+players.map((p,i)=>'<tr'+(p.id===state.user?.$id?' class="me"':'')+'><td><span class="rank-position">'+(i<3?'<span aria-hidden="true">'+medals[i]+'</span>':'')+ordinal(i+1)+'</span></td><td><span class="rank-name">'+escapeHTML(p.nom)+presenceDot(p)+'</span>'+(p.id===state.user?.$id?'<span class="rank-you">Tu</span>':'')+'<small class="rank-games">'+fmt(p.partides)+' partides</small></td><td><strong>'+fmt(p.punts)+'</strong></td></tr>').join('')+'</tbody></table><p class="hint rank-footnote">Cada examen suma els seus encerts i errors. Continua practicant per pujar posicions.</p>':'<div class="rank-empty"><span aria-hidden="true">🏆</span><h2>El primer lloc t’espera</h2><p class="sub">Completa un examen de Socials per aparèixer al rànquing.</p></div>';}catch(e){const box=document.getElementById('socialList');if(box)box.textContent=errorMessage(e);}
+  function renderEnglishQuestion(){
+    if(!englishRun)return;
+    const r=englishRun;
+    if(r.index>=r.order.length){
+      const grade=Math.round(r.correct/r.order.length*100)/10;
+      show('<div class="panel narrow center"><div class="eyebrow">Vocabulary · Anglès</div><h1>Quiz completat</h1><p class="sub">Has acabat les 55 preguntes.</p><div class="score-row" style="justify-content:center"><div class="scorebo…262 tokens truncated…'+v[3].replace('___','_____')+'”';correct=v[4];}
+    const pool=item.kind==='en-es'?r.vocab.map(x=>x[2]):r.vocab.map(x=>x[1]);
+    const options=shuffleItems([correct,...shuffleItems([...new Set(pool.filter(x=>x!==correct))]).slice(0,3)]);
+    const category=v[0].startsWith('data')||['break-through','file-names','screenshot','spreadsheet','upgrade','bookmark','bug','crash','run','network','icon','browse'].includes(v[0])?'Technology':v[0].includes('plug')||v[0].includes('steam')||v[0].includes('sharpest')||v[0].includes('cutting')||v[0].includes('test')||v[0].includes('rocket')||v[0].includes('wires')||v[0].includes('fuse')||v[0].includes('bulb')?'Idioms':v[0]==='peel'||v[0]==='blend'||v[0]==='chop'||v[0]==='dice'||v[0]==='marinate'||v[0]==='season'||v[0]==='saute'||v[0]==='thaw'||v[0]==='preserve'||v[0]==='ripen'||v[0]==='waste'||v[0]==='go-off'?'Cooking':'Food';
+    show('<div class="panel"><div class="eyebrow">'+category+' · Question '+(r.index+1)+' / '+r.order.length+'</div><div class="bar"><h1>Vocabulary</h1><strong>'+r.points+' punts</strong></div><div class="progress"><div style="width:'+((r.index)/r.order.length*100)+'%"></div></div><h2 class="question">'+escapeHTML(prompt)+'</h2><form id="englishAnswer" class="stack">'+options.map(x=>'<label class="option"><input type="radio" name="answer" value="'+escapeHTML(x)+'" required><span>'+escapeHTML(x)+'</span></label>').join('')+'<button class="btn primary full" id="sendEnglish">RESPONDRE</button><div id="feedback" hidden></div></form><p class="hint">+10 punts per encert · −10 punts per error</p><button class="btn link" id="exitEnglish">Sortir</button></div>');
+    document.getElementById('exitEnglish').onclick=()=>{englishRun=null;examPractice('angles');};
+    document.getElementById('englishAnswer').onsubmit=async e=>{
+      e.preventDefault();if(r.busy)return;r.busy=true;const answer=new FormData(e.currentTarget).get('answer');const btn=document.getElementById('sendEnglish');btn.disabled=true;
+      try{
+        const result=await api({action:'englishAnswer',session:r.session,index:r.index,answer:String(answer)});
+        r.points=result.points;r.index=result.index;r.correct+=result.correct?1:0;r.wrong+=result.correct?0:1;
+        const box=document.getElementById('feedback');box.hidden=false;box.className='message '+(result.correct?'ok':'error');box.textContent=result.correct?'Correcte! +10 punts':'Incorrecte. Resposta correcta: '+result.solution+' · −10 punts';
+        if(result.finished){r.index=r.order.length;setTimeout(renderEnglishQuestion,1100);}else setTimeout(renderEnglishQuestion,1300);
+      }catch(err){r.busy=false;btn.disabled=false;msg(errorMessage(err),true);}
+    };
   }
 
 
@@ -535,9 +552,18 @@
     }catch(e){if(viewVersion===version)msg(errorMessage(e),true);}
   }
   function chooseRanking(){
-    show('<div class="panel"><div class="eyebrow">Classificació</div><h1>Tria una disciplina</h1><p class="sub">Consulta els punts de cada matèria.</p><div class="grid2"><button class="mode full" id="lexicRanking"><h3>Lèxic · primer trimestre</h3><p>Inclou lèxic, dictats i català.</p><span class="btn primary">VEURE PUNTUACIONS</span></button><button class="mode full" id="socialRankingMenu"><h3>Socials</h3><p>+10 per encert · −10 per error.</p><span class="btn primary">VEURE PUNTUACIONS</span></button></div><button class="btn" id="backHome" style="margin-top:18px">← Tornar</button></div>');
-    document.getElementById('lexicRanking').onclick=()=>ranking();document.getElementById('backHome').onclick=home;
-    document.getElementById('socialRankingMenu').onclick=()=>rankingSocial();
+    show('<div class="panel"><div class="eyebrow">Classificació</div><h1>Tria una disciplina</h1><p class="sub">Consulta els punts de cada matèria.</p><button class="mode full" id="lexicRanking"><h3>Lèxic · primer trimestre</h3><p>Inclou lèxic, dictats i català.</p><span class="btn primary">VEURE PUNTUACIONS</span></button><button class="mode full" id="englishRankingBtn" style="margin-top:12px"><h3>Anglès · trimestral</h3><p>Vocabulary</p><span class="btn secondary">VEURE PUNTUACIONS</span></button><button class="btn" id="backHome" style="margin-top:18px">← Tornar</button></div>');
+    document.getElementById('lexicRanking').onclick=()=>ranking();document.getElementById('englishRankingBtn').onclick=englishRanking;document.getElementById('backHome').onclick=home;
+  }
+  async function englishRanking(){
+    show('<div class="panel"><div class="eyebrow">Classificació pública · Anglès</div><h1>Rànquing d’Anglès</h1><p class="sub">Punts acumulats al quiz Vocabulary – Trimestral d’anglès.</p><div id="list" data-discipline="english"><p>Carregant puntuacions…</p></div><button class="btn secondary" id="chooseDiscipline">← Tria una altra disciplina</button><div id="feedback" hidden></div></div>');
+    document.getElementById('chooseDiscipline').onclick=chooseRanking;
+    try{
+      const data=await api({action:'rankingDiscipline',discipline:'english'}),players=data.ranking||[];
+      const fmt=n=>Number(n||0).toLocaleString('ca-ES'),medals=['🥇','🥈','🥉'];
+      const list=document.getElementById('list');if(!list)return;
+      list.innerHTML=players.length?'<table class="ranking ranking-fresh"><thead><tr><th>Posició</th><th>Jugador</th><th>Punts d’Anglès</th></tr></thead><tbody>'+players.map((p,i)=>'<tr'+(p.id===state.user?.$id?' class="me"':'')+'><td>'+(medals[i]||((i+1)+'è'))+'</td><td>'+escapeHTML(p.nom)+(p.id===state.user?.$id?'<span class="rank-you">Tu</span>':'')+'<small class="rank-games">'+fmt(p.partides)+' quizzes</small></td><td><strong>'+fmt(p.punts)+'</strong></td></tr>').join('')+'</tbody></table>':'<div class="rank-empty"><h2>Encara no hi ha puntuacions</h2><p>Completa el quiz de vocabulari per estrenar el rànquing.</p></div>';
+    }catch(e){msg(errorMessage(e),true);}
   }
   const examEvents={
     '2026-11-24':[{subject:'Socials',title:'Examen trimestral de la 1a avaluació',audience:'class',group:'C'}],
