@@ -156,17 +156,21 @@ export default async ({req,res,error})=>{
     }
     if(action==='englishAnswer'){
       const run=me.prefs?.englishQuiz;
+      // A retry after a timeout returns the original result without awarding points twice.
+      if(run?.lastAnswer&&run.lastAnswer.session===body.session&&run.lastAnswer.index===body.index&&run.lastAnswer.requestId===body.requestId)
+        return res.json(run.lastAnswer.result);
       if(!run||run.session!==body.session||run.index!==body.index||run.index>=run.order.length)
         return res.json({error:'Aquesta resposta ja s’ha guardat o el test ha canviat.'},409);
       const entry=run.order[run.index],v=ENGLISH_VOCAB.find(x=>x[0]===entry.id);
-      if(!v||typeof body.answer!=='string'||body.answer.length>250)
+      if(typeof body.requestId!=='string'||body.requestId.length>80||!v||typeof body.answer!=='string'||body.answer.length>250)
         return res.json({error:'Resposta invàlida.'},400);
       const expected=entry.kind==='en-es'?v[2]:entry.kind==='sentence'?v[4]:v[1];
       const ok=normalitza(body.answer)===normalitza(expected);
       const scores=getScores(),english=(Number(scores.english)||0)+(ok?10:-10);
       const next={...run,index:run.index+1,correct:run.correct+(ok?1:0),wrong:run.wrong+(ok?0:1)};
-      await updatePrefs({...me.prefs,disciplinePoints:{...scores,english},englishQuiz:next,...(next.index===next.order.length?{englishGames:(Number(me.prefs?.englishGames)||0)+1}:{})});
-      return res.json({correct:ok,solution:expected,index:next.index,total:next.order.length,points:english,finished:next.index===next.order.length,grade:Math.round(next.correct/next.order.length*100)/10});
+      const result={correct:ok,solution:expected,index:next.index,total:next.order.length,points:english,finished:next.index===next.order.length,grade:Math.round(next.correct/next.order.length*100)/10};
+      await updatePrefs({...me.prefs,disciplinePoints:{...scores,english},englishQuiz:{...next,lastAnswer:{session:run.session,index:run.index,requestId:body.requestId,result}},...(next.index===next.order.length?{englishGames:(Number(me.prefs?.englishGames)||0)+1}:{})});
+      return res.json(result);
     }
     if(action==='rankingDiscipline'){
       const discipline=String(body.discipline||'');
