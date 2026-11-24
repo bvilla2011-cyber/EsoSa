@@ -119,7 +119,7 @@
     });
   }
   async function api(body){
-    const retryable=['answer','leave','englishAnswer'].includes(body?.action);
+    const retryable=['answer','leave','englishAnswer','englishUnitAnswer','englishWriting'].includes(body?.action);
     let r;
     for(let attempt=0;;attempt++){
       try{r=await functions.createExecution({functionId:'motor',body:JSON.stringify(body),async:false,method:'POST'});}
@@ -329,7 +329,12 @@
   function examPractice(id){
     const exam=upcomingExams.find(item=>item.id===id);if(!exam)return pickMode();
     if(id==='angles'){
-      show('<div class="panel"><div class="eyebrow">Trimestral d’anglès</div><h1>Vocabulary – Trimestral d’anglès</h1><p class="sub">Un únic quiz amb les 55 paraules i expressions de tecnologia, idioms, menjar i cuina. L’ordre canvia a cada intent.</p><section class="mode"><h3>Quiz complet · 55 preguntes</h3><p>Combina traduccions i frases per completar. +10 per encert, −10 per error. Cada resposta s’afegeix al rànquing d’Anglès.</p><button class="btn primary full" id="startEnglish">COMENÇAR QUIZ</button></section><button class="btn full" id="backExams" style="margin-top:20px">← Tornar als exàmens</button></div>');
+      show('<div class="panel"><div class="eyebrow">Examen trimestral · Anglès</div><h1>Unit 7 + Unit 8</h1><p class="sub">Pla complet per dominar gramàtica, vocabulari i els dos writings. Les respostes puntuen al rànquing d’Anglès.</p><div class="grid2"><section class="mode"><h3>Pla d’estudi</h3><p>Set sessions curtes, de la gramàtica al simulacre final.</p><button class="btn secondary full" id="unitPlan">VEURE EL PLA</button></section><section class="mode"><h3>Quiz aleatori</h3><p>20 preguntes aleatòries de les Unit 7 i 8. +10 encert · −10 error.</p><button class="btn primary full" id="unitQuiz">COMENÇAR QUIZ</button></section><section class="mode"><h3>Flashcards</h3><p>Targetes per repassar estructures, vocabulari i models d’escriptura.</p><button class="btn secondary full" id="unitCards">OBRIR FLASHCARDS</button></section><section class="mode"><h3>Writing · For and against</h3><p>Rep un tema, escriu les dues postures i obtén nota sobre 10 amb retorn per criteris.</p><button class="btn secondary full" id="unitEssay">PRACTICAR L’ESSAY</button></section><section class="mode"><h3>Writing · Informal e-mail</h3><p>Practica estructura, registre informal i contingut del correu.</p><button class="btn secondary full" id="unitEmail">PRACTICAR L’E-MAIL</button></section><section class="mode"><h3>Vocabulary trimestral</h3><p>Practica les 55 paraules i expressions de tecnologia, idioms, menjar i cuina.</p><button class="btn secondary full" id="startEnglish">QUIZ DE VOCABULARY</button></section></div><button class="btn full" id="backExams" style="margin-top:20px">← Tornar als exàmens</button></div>');
+      document.getElementById('unitPlan').onclick=englishUnitPlan;
+      document.getElementById('unitQuiz').onclick=startEnglishUnitQuiz;
+      document.getElementById('unitCards').onclick=startEnglishFlashcards;
+      document.getElementById('unitEssay').onclick=()=>startEnglishWriting('essay');
+      document.getElementById('unitEmail').onclick=()=>startEnglishWriting('email');
       document.getElementById('startEnglish').onclick=startEnglishQuiz;document.getElementById('backExams').onclick=pickMode;return;
     }
     if(id==='socials'){
@@ -384,6 +389,87 @@
       }catch(err){r.busy=false;btn.disabled=false;msg(errorMessage(err),true);}
     };
   }
+
+  let englishUnitsModule=null,englishUnitRun=null,englishCardsRun=null,englishWritingRun=null;
+  async function getEnglishUnits(){if(!englishUnitsModule)englishUnitsModule=await import('./src/english-units.js');return englishUnitsModule;}
+  function englishBackButton(){document.getElementById('englishUnitsBack')?.addEventListener('click',()=>examPractice('angles'));}
+  async function englishUnitPlan(){
+    try{
+      const {ENGLISH_UNIT_PLAN}=await getEnglishUnits();
+      show('<div class="panel"><div class="eyebrow">Anglès · pla de preparació</div><h1>Set sessions per al trimestral</h1><p class="sub">Segueix-les en ordre o repeteix les que et costin més. El pla inclou tot el contingut de les Unit 7 i 8.</p><div class="stack">'+ENGLISH_UNIT_PLAN.map(([n,title,topics,task,duration])=>'<section class="mode"><div class="bar"><h3>Sessió '+n+' · '+escapeHTML(title)+'</h3><span class="hint">'+escapeHTML(duration)+'</span></div><p><strong>Contingut:</strong> '+escapeHTML(topics)+'</p><p><strong>Practica:</strong> '+escapeHTML(task)+'</p></section>').join('')+'</div><button class="btn primary full" id="planQuiz" style="margin-top:18px">COMENÇAR QUIZ ALEATORI</button><button class="btn secondary full" id="englishUnitsBack">← Tornar a Unit 7 + Unit 8</button></div>');
+      document.getElementById('planQuiz').onclick=startEnglishUnitQuiz;englishBackButton();
+    }catch(e){msg(errorMessage(e),true);}
+  }
+  async function startEnglishUnitQuiz(){
+    try{
+      const data=await getEnglishUnits(),order=shuffleItems(data.ENGLISH_UNIT_QUESTIONS).slice(0,20).map(q=>q.id);
+      const started=await api({action:'englishUnitStart',order});
+      englishUnitRun={session:started.session,order,index:0,points:started.points,correct:0,wrong:0,busy:false,pendingRequestId:null,result:null};
+      renderEnglishUnitQuestion();
+    }catch(e){show('<div class="panel"><h1>No s’ha pogut començar el quiz</h1><p class="sub">'+escapeHTML(errorMessage(e))+'</p><button class="btn" id="englishUnitsBack">Tornar a Unit 7 + Unit 8</button></div>');englishBackButton();}
+  }
+  function renderEnglishUnitQuestion(){
+    const r=englishUnitRun;if(!r)return;
+    if(r.index>=r.order.length){renderEnglishUnitResult();return;}
+    const {ENGLISH_UNIT_QUESTIONS}=englishUnitsModule,q=ENGLISH_UNIT_QUESTIONS.find(x=>x.id===r.order[r.index]);
+    const options=shuffleItems(q.options);
+    show('<div class="panel"><div class="eyebrow">Anglès · '+escapeHTML(q.topic)+' · Pregunta '+(r.index+1)+' / '+r.order.length+'</div><div class="bar"><h1>Quiz Unit 7 + Unit 8</h1><strong>'+r.points+' punts d’Anglès</strong></div><div class="progress"><div style="width:'+Math.round(r.index/r.order.length*100)+'%"></div></div><h2 class="question">'+escapeHTML(q.prompt)+'</h2><form id="unitAnswerForm" class="stack">'+options.map(x=>'<label class="option"><input type="radio" name="answer" value="'+escapeHTML(x)+'" required><span>'+escapeHTML(x)+'</span></label>').join('')+'<button class="btn primary full" id="unitAnswerButton">RESPONDRE</button><div id="feedback" hidden></div></form><p class="hint">+10 punts per encert · −10 punts per error</p><button class="btn link" id="englishUnitsBack">Sortir del quiz</button></div>');
+    document.getElementById('englishUnitsBack').onclick=()=>{englishUnitRun=null;examPractice('angles');};
+    document.getElementById('unitAnswerForm').onsubmit=async e=>{
+      e.preventDefault();if(r.busy)return;r.busy=true;
+      const answer=String(new FormData(e.currentTarget).get('answer')||''),requestId=r.pendingRequestId||(r.pendingRequestId=crypto.randomUUID()),button=document.getElementById('unitAnswerButton');button.disabled=true;
+      try{
+        const result=await api({action:'englishUnitAnswer',session:r.session,index:r.index,requestId,answer});r.pendingRequestId=null;
+        r.points=result.points;r.index=result.index;r.correct+=result.correct?1:0;r.wrong+=result.correct?0:1;r.result=result;
+        const form=document.getElementById('unitAnswerForm');form.querySelectorAll('input,button').forEach(el=>el.disabled=true);
+        const box=document.getElementById('feedback');box.hidden=false;box.className='message '+(result.correct?'ok':'error');box.textContent=(result.correct?'Correcte! +10 punts. ':'Incorrecte. −10 punts. Resposta: '+result.solution+'. ')+result.explanation;
+        const next=document.createElement('button');next.className='btn primary full';next.textContent=result.finished?'VEURE RESULTATS':'SEGÜENT PREGUNTA';next.onclick=()=>{r.busy=false;renderEnglishUnitQuestion();};form.append(next);
+      }catch(err){r.busy=false;button.disabled=false;msg(errorMessage(err),true);}
+    };
+  }
+  function renderEnglishUnitResult(){
+    const r=englishUnitRun,grade=Math.round(r.correct/r.order.length*1000)/100;
+    show('<div class="panel narrow center"><div class="eyebrow">Simulacre aleatori · Unit 7 + Unit 8</div><h1>Quiz completat</h1><p class="sub">Les preguntes s’han barrejat en començar. Pots repetir-lo per veure una selecció diferent.</p><div class="score-row" style="justify-content:center"><div class="scorebox"><strong>'+grade.toLocaleString('ca-ES')+' / 10</strong><small>Nota</small></div><div class="scorebox"><strong>'+r.points.toLocaleString('ca-ES')+'</strong><small>Punts d’Anglès acumulats</small></div><div class="scorebox"><strong>'+r.correct+' / '+r.order.length+'</strong><small>Encerts</small></div></div><p class="hint">'+r.wrong+' errors · Resultat desat al rànquing d’Anglès.</p><button class="btn primary full" id="repeatUnits">NOU QUIZ ALEATORI</button><button class="btn secondary full" id="unitResultPlan">TORNAR AL PLA D’ESTUDI</button><button class="btn full" id="unitResultRank">VEURE RÀNQUING D’ANGLÈS</button></div>');
+    document.getElementById('repeatUnits').onclick=startEnglishUnitQuiz;document.getElementById('unitResultPlan').onclick=englishUnitPlan;document.getElementById('unitResultRank').onclick=englishRanking;
+  }
+  async function startEnglishFlashcards(){
+    try{
+      const {ENGLISH_UNIT_FLASHCARDS}=await getEnglishUnits();englishCardsRun={cards:shuffleItems(ENGLISH_UNIT_FLASHCARDS),index:0,shown:false};
+      renderEnglishFlashcard();
+    }catch(e){msg(errorMessage(e),true);}
+  }
+  function renderEnglishFlashcard(){
+    const r=englishCardsRun;if(!r)return;const card=r.cards[r.index];
+    show('<div class="panel narrow"><div class="eyebrow">Flashcards · Unit 7 + Unit 8</div><div class="bar"><h1>'+escapeHTML(card[0])+'</h1><span class="hint">'+(r.index+1)+' / '+r.cards.length+'</span></div><section class="mode"><h2 class="question">'+escapeHTML(r.shown?card[1]:'Intenta recordar la respuesta…')+'</h2>'+(r.shown?'<p>'+escapeHTML(card[2])+'</p>':'')+'</section><button class="btn primary full" id="flipCard">'+(r.shown?'MOSTRAR OTRA VEGADA':'VEURE RESPOSTA')+'</button><button class="btn secondary full" id="nextCard">'+(r.index+1===r.cards.length?'ACABAR FLASHCARDS':'SEGÜENT TARGETA')+'</button><button class="btn link" id="englishUnitsBack">← Tornar</button></div>');
+    document.getElementById('flipCard').onclick=()=>{r.shown=!r.shown;renderEnglishFlashcard();};
+    document.getElementById('nextCard').onclick=()=>{if(r.index+1===r.cards.length){englishCardsRun=null;englishUnitPlan();}else{r.index++;r.shown=false;renderEnglishFlashcard();}};
+    document.getElementById('englishUnitsBack').onclick=()=>{englishCardsRun=null;examPractice('angles');};
+  }
+  async function startEnglishWriting(kind){
+    try{
+      const {ENGLISH_UNIT_WRITING_TOPICS}=await getEnglishUnits(),topics=ENGLISH_UNIT_WRITING_TOPICS.filter(x=>x.kind===kind),topic=topics[Math.floor(Math.random()*topics.length)];
+      englishWritingRun={kind,topic,pendingRequestId:null};renderEnglishWriting();
+    }catch(e){msg(errorMessage(e),true);}
+  }
+  function renderEnglishWriting(){
+    const r=englishWritingRun;if(!r)return;const title=r.kind==='essay'?'For and against essay':'Informal e-mail',target=r.kind==='essay'?'120–180 paraules':'80–150 paraules';
+    show('<div class="panel"><div class="eyebrow">Writing · '+title+'</div><h1>'+escapeHTML(r.topic.title)+'</h1><p class="sub">'+escapeHTML(r.topic.guide)+'</p><div class="mode"><strong>Objectiu:</strong> '+target+(r.kind==='essay'?'<br>Fes una introducció, arguments a favor, arguments en contra i una conclusió equilibrada.':'<br>Inclou salutació, motiu, detalls, to informal i comiat.')+'</div><form id="writingForm" class="stack" style="margin-top:16px"><label>Escriu en anglès<textarea name="text" rows="12" maxlength="6000" required placeholder="Escriu aquí el teu text..."></textarea></label><div class="hint" id="wordCount">0 paraules</div><button class="btn primary full" id="writingSubmit">CORREGIR I VEURE NOTA</button><div id="feedback" hidden></div></form><button class="btn secondary full" id="newWritingTopic">CANVIAR TEMA</button><button class="btn link" id="englishUnitsBack">← Tornar a Unit 7 + Unit 8</button></div>');
+    const form=document.getElementById('writingForm'),area=form.elements.text,counter=document.getElementById('wordCount');
+    area.oninput=()=>{const n=(area.value.match(/[A-Za-z]+(?:[’'-][A-Za-z]+)*/g)||[]).length;counter.textContent=n+' paraules';};
+    document.getElementById('newWritingTopic').onclick=()=>startEnglishWriting(r.kind);document.getElementById('englishUnitsBack').onclick=()=>{englishWritingRun=null;examPractice('angles');};
+    form.onsubmit=async e=>{
+      e.preventDefault();const button=document.getElementById('writingSubmit');if(button.disabled)return;button.disabled=true;
+      const text=String(new FormData(form).get('text')||''),requestId=r.pendingRequestId||(r.pendingRequestId=crypto.randomUUID());
+      try{const result=await api({action:'englishWriting',requestId,kind:r.kind,topicId:r.topic.id,text});renderEnglishWritingResult(result);}
+      catch(err){button.disabled=false;msg(errorMessage(err),true);}
+    };
+  }
+  function renderEnglishWritingResult(result){
+    const pointsLabel=result.delta>=0?'+'+result.delta:String(result.delta),corrections=result.corrections||[];
+    show('<div class="panel"><div class="eyebrow">Correcció automàtica · '+(englishWritingRun?.kind==='essay'?'For and against':'Informal e-mail')+'</div><h1>Resultat del writing</h1><p class="sub">'+escapeHTML(result.topic)+'</p><div class="score-row"><div class="scorebox"><strong>'+Number(result.grade).toLocaleString('ca-ES')+' / 10</strong><small>Nota</small></div><div class="scorebox"><strong>'+escapeHTML(pointsLabel)+'</strong><small>Punts d’Anglès d’aquest writing</small></div><div class="scorebox"><strong>'+result.wordCount+'</strong><small>Paraules</small></div></div><section class="mode"><h3>Retorn</h3><ul>'+result.feedback.map(x=>'<li>'+escapeHTML(x)+'</li>').join('')+'</ul></section>'+(corrections.length?'<section class="mode"><h3>Correccions detectades</h3>'+corrections.map(x=>'<p><strong>'+escapeHTML(x.label)+':</strong> “'+escapeHTML(x.found)+'” → “'+escapeHTML(x.suggestion)+'”</p>').join('')+'</section>':'')+'<p class="hint">La nota valora extensió, estructura, equilibri d’arguments, connectors, registre i alguns errors freqüents. La revisió automàtica pot no detectar tots els errors de gramàtica.</p><button class="btn primary full" id="writingAgain">PRACTICAR UN ALTRE TEMA</button><button class="btn secondary full" id="writingBack">TORNAR A UNIT 7 + UNIT 8</button><button class="btn full" id="writingRank">VEURE RÀNQUING D’ANGLÈS</button></div>');
+    document.getElementById('writingAgain').onclick=()=>startEnglishWriting(englishWritingRun?.kind||'essay');document.getElementById('writingBack').onclick=()=>examPractice('angles');document.getElementById('writingRank').onclick=englishRanking;
+  }
+
 
   const practice={pool:[],count:0,last:null};
   const practiceNormalize=s=>String(s??'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLocaleLowerCase('ca').replace(/[‘’´]/g,"'").replace(/[^a-z0-9çñ·' ]/g,' ').replace(/\s+/g,' ').trim();

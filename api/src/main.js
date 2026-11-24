@@ -3,6 +3,7 @@ import { opcionsDificils } from '../../src/distractors.js';
 import { createHash } from 'node:crypto';
 import { LEXIC, DITES, CATANYOL } from '../../src/banc.js';
 import { ENGLISH_VOCAB } from '../../src/english-vocab.js';
+import { ENGLISH_UNIT_QUESTIONS, ENGLISH_UNIT_WRITING_TOPICS, gradeEnglishWriting } from '../../src/english-units.js';
 
 const BUITS=[];
 
@@ -141,7 +142,7 @@ export default async ({req,res,error})=>{
     if(!data||typeof data!=='object'||Array.isArray(data))return {};
     return Object.fromEntries(Object.entries(data).filter(([k,v])=>v&&Number.isFinite(v.at)&&Date.now()-v.at<75000).slice(-12));
   };
-  if(['englishStart','englishAnswer','rankingDiscipline'].includes(action)){
+  if(['englishStart','englishAnswer','englishUnitStart','englishUnitAnswer','englishWriting','rankingDiscipline'].includes(action)){
     const getScores=()=>me.prefs?.disciplinePoints&&typeof me.prefs.disciplinePoints==='object'?me.prefs.disciplinePoints:{};
     const updatePrefs=async prefs=>users.updatePrefs({userId,prefs});
     if(action==='englishStart'){
@@ -170,6 +171,47 @@ export default async ({req,res,error})=>{
       const next={...run,index:run.index+1,correct:run.correct+(ok?1:0),wrong:run.wrong+(ok?0:1)};
       const result={correct:ok,solution:expected,index:next.index,total:next.order.length,points:english,finished:next.index===next.order.length,grade:Math.round(next.correct/next.order.length*100)/10};
       await updatePrefs({...me.prefs,disciplinePoints:{...scores,english},englishQuiz:{...next,lastAnswer:{session:run.session,index:run.index,requestId:body.requestId,result}},...(next.index===next.order.length?{englishGames:(Number(me.prefs?.englishGames)||0)+1}:{})});
+      return res.json(result);
+    }
+    if(action==='englishUnitStart'){
+      const order=body.order;
+      const ids=new Set(ENGLISH_UNIT_QUESTIONS.map(q=>q.id));
+      if(!Array.isArray(order)||order.length!==20||new Set(order).size!==20||order.some(id=>!ids.has(id)))
+        return res.json({error:'El quiz de les Units 7–8 no és vàlid.'},400);
+      const session=ID.unique(),run={session,order,index:0,correct:0,wrong:0,lastAnswer:null};
+      await updatePrefs({...me.prefs,englishUnitQuiz:run});
+      return res.json({session,total:order.length,points:Number(getScores().english)||0});
+    }
+    if(action==='englishUnitAnswer'){
+      const run=me.prefs?.englishUnitQuiz;
+      if(run?.lastAnswer&&run.lastAnswer.session===body.session&&run.lastAnswer.index===body.index&&run.lastAnswer.requestId===body.requestId)
+        return res.json(run.lastAnswer.result);
+      if(!run||run.session!==body.session||run.index!==body.index||run.index>=run.order.length)
+        return res.json({error:'La sessió de pràctica ha canviat. Torna a començar el quiz.'},409);
+      if(typeof body.requestId!=='string'||body.requestId.length>80||typeof body.answer!=='string'||body.answer.length>300)
+        return res.json({error:'Resposta invàlida.'},400);
+      const q=ENGLISH_UNIT_QUESTIONS.find(item=>item.id===run.order[run.index]);
+      if(!q)return res.json({error:'Pregunta no trobada.'},404);
+      const ok=normalitza(body.answer)===normalitza(q.options[q.answer]);
+      const scores=getScores(),english=(Number(scores.english)||0)+(ok?10:-10);
+      const next={...run,index:run.index+1,correct:run.correct+(ok?1:0),wrong:run.wrong+(ok?0:1)};
+      const result={correct:ok,solution:q.options[q.answer],explanation:q.explanation,index:next.index,total:next.order.length,points:english,delta:ok?10:-10,finished:next.index===next.order.length,grade:Math.round(next.correct/next.order.length*1000)/100};
+      await updatePrefs({...me.prefs,disciplinePoints:{...scores,english},englishUnitQuiz:{...next,lastAnswer:{session:run.session,index:run.index,requestId:body.requestId,result}},...(result.finished?{englishGames:(Number(me.prefs?.englishGames)||0)+1}:{})});
+      return res.json(result);
+    }
+    if(action==='englishWriting'){
+      const receipts=Array.isArray(me.prefs?.englishWritingReceipts)?me.prefs.englishWritingReceipts:[];
+      const previous=receipts.find(item=>item?.requestId===body.requestId);
+      if(previous)return res.json(previous.result);
+      if(typeof body.requestId!=='string'||body.requestId.length>80||!['essay','email'].includes(body.kind)||typeof body.text!=='string'||body.text.length>6000)
+        return res.json({error:'El text de writing no és vàlid.'},400);
+      const topic=ENGLISH_UNIT_WRITING_TOPICS.find(item=>item.id===body.topicId&&item.kind===body.kind);
+      if(!topic)return res.json({error:'No s’ha trobat el tema de writing.'},400);
+      const assessment=gradeEnglishWriting(body.text,body.kind);
+      const delta=Math.round(assessment.grade*3)-10;
+      const scores=getScores(),english=(Number(scores.english)||0)+delta;
+      const result={...assessment,topic:topic.title,points:english,delta};
+      await updatePrefs({...me.prefs,disciplinePoints:{...scores,english},englishWritingReceipts:[...receipts,{requestId:body.requestId,result}].slice(-25),englishGames:(Number(me.prefs?.englishGames)||0)+1});
       return res.json(result);
     }
     if(action==='rankingDiscipline'){
