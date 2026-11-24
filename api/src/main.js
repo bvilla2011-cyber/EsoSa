@@ -2,7 +2,7 @@ import { Client, TablesDB, Users, ID, Query } from 'node-appwrite';
 import { opcionsDificils } from '../../src/distractors.js';
 import { createHash } from 'node:crypto';
 import { LEXIC, DITES, CATANYOL } from '../../src/banc.js';
-import { questions as socialQuestions } from '../../socials.js';
+import { ENGLISH_VOCAB } from '../../src/english-vocab.js';
 
 const BUITS=[];
 
@@ -98,11 +98,9 @@ export default async ({req,res,error})=>{
     return res.json({error:'Cal confirmar que ets de 4t d’ESO i indicar el nivell flexible i el grup classe.'},403);
   const read=async (table,rowId)=>tables.getRow({databaseId:DB,tableId:table,rowId});
   const write=async (table,rowId,data)=>tables.updateRow({databaseId:DB,tableId:table,rowId,data});
-  const nomCorreu=(email,fallback='Jugador')=>String(email||'').split('@')[0].trim().slice(0,80)||String(fallback||'Jugador').slice(0,80);
-  const nomUsuari=async(id,fallback)=>{try{const u=await users.get(id);return nomCorreu(u.email,fallback);}catch{return fallback||'Jugador';}};
-  const inicial=()=>({nom:nomCorreu(me.email,me.name),punts:0,partides:0,encerts:0,errors:0});
+  const inicial=()=>({nom:String(me.name||'Jugador').slice(0,80),punts:0,partides:0,encerts:0,errors:0});
   const perfil=async()=>{
-    try{const p=await read(PERFILS,userId),nom=nomCorreu(me.email,me.name);if(p.nom!==nom)return await write(PERFILS,userId,{nom});return p;}
+    try{return await read(PERFILS,userId);}
     catch(e){if(e.code!==404)throw e;try{return await tables.createRow({databaseId:DB,tableId:PERFILS,rowId:userId,data:inicial()});}catch(x){if(x.code===409)return read(PERFILS,userId);throw x;}}
   };
   // Desa una partida sencera o interrompuda en una única transacció atòmica.
@@ -143,26 +141,40 @@ export default async ({req,res,error})=>{
     if(!data||typeof data!=='object'||Array.isArray(data))return {};
     return Object.fromEntries(Object.entries(data).filter(([k,v])=>v&&Number.isFinite(v.at)&&Date.now()-v.at<75000).slice(-12));
   };
-  if(action==='socialFinish'){
-    const model=String(body.model||''),qs=socialQuestions(model),answers=body.answers,attempt=String(body.attempt||'');
-    if(!qs.length||!Array.isArray(answers)||answers.length!==qs.length||!/^[a-f0-9-]{36}$/.test(attempt)||answers.some((x,i)=>!Number.isInteger(x)||x<0||x>=qs[i].options.length))return res.json({error:'Respostes o model no vàlids.'},400);
-    const resultats=qs.map((q,i)=>answers[i]===q.correct);
-    const correctes=resultats.filter(Boolean).length,errors=qs.length-correctes,punts=(correctes-errors)*10;
-    const total=qs.reduce((n,q)=>n+q.weight,0),nota=Math.round(resultats.reduce((n,ok,i)=>n+(ok?qs[i].weight:0),0)*100/total)/10;
-    try{await tables.createRow({databaseId:DB,tableId:'social_attempts',rowId:attempt,data:{usuari:userId,model,nota,punts}});}
-    catch(e){if(e.code===409)return res.json({error:'Aquest examen ja s’ha lliurat. Torna als models per iniciar-ne un de nou.'},409);throw e;}
-    return res.json({nota,correctes,errors,punts,resultats});
-  }
-  if(action==='socialRanking'){
-    const totals=new Map();let cursor=null;
-    do{
-      const queries=[Query.orderAsc('$id'),Query.limit(100)];if(cursor)queries.push(Query.cursorAfter(cursor));
-      const result=await tables.listRows({databaseId:DB,tableId:'social_attempts',queries});const rows=result.rows||result.documents||[];
-      for(const row of rows){const old=totals.get(row.usuari)||{punts:0,partides:0};old.punts+=row.punts;old.partides++;totals.set(row.usuari,old);}
-      cursor=rows.length===100?rows[rows.length-1].$id:null;
-    }while(cursor);
-    const ranking=await Promise.all([...totals.entries()].map(async ([id,data])=>{let nom='Jugador';try{nom=await nomUsuari(id,(await read(PERFILS,id)).nom);}catch{}return {id,nom,...data};}));
-    ranking.sort((a,b)=>b.punts-a.punts||a.nom.localeCompare(b.nom));return res.json({ranking:ranking.slice(0,100)});
+  if(['englishStart','englishAnswer','rankingDiscipline'].includes(action)){
+    const getScores=()=>me.prefs?.disciplinePoints&&typeof me.prefs.disciplinePoints==='object'?me.prefs.disciplinePoints:{};
+    const updatePrefs=async prefs=>users.updatePrefs({userId,prefs});
+    if(action==='englishStart'){
+      const order=body.order;
+      const validKinds=['en-es','es-en','sentence'];
+      if(!Array.isArray(order)||order.length!==ENGLISH_VOCAB.length||new Set(order.map(x=>x?.id)).size!==ENGLISH_VOCAB.length||order.some(x=>!ENGLISH_VOCAB.some(v=>v[0]===x?.id)||!validKinds.includes(x?.kind)))
+        return res.json({error:'El formulari d’anglès no és vàlid.'},400);
+      const session=ID.unique();
+      const run={session,order,index:0,correct:0,wrong:0};
+      await updatePrefs({...me.prefs,englishQuiz:run});
+      return res.json({session,total:order.length,points:Number(getScores().english)||0});
+    }
+    if(action==='englishAnswer'){
+      const run=me.prefs?.englishQuiz;
+      if(!run||run.session!==body.session||run.index!==body.index||run.index>=run.order.length)
+        return res.json({error:'Aquesta resposta ja s’ha guardat o el test ha canviat.'},409);
+      const entry=run.order[run.index],v=ENGLISH_VOCAB.find(x=>x[0]===entry.id);
+      if(!v||typeof body.answer!=='string'||body.answer.length>250)
+        return res.json({error:'Resposta invàlida.'},400);
+      const expected=entry.kind==='en-es'?v[2]:entry.kind==='sentence'?v[4]:v[1];
+      const ok=normalitza(body.answer)===normalitza(expected);
+      const scores=getScores(),english=(Number(scores.english)||0)+(ok?10:-10);
+      const next={...run,index:run.index+1,correct:run.correct+(ok?1:0),wrong:run.wrong+(ok?0:1)};
+      await updatePrefs({...me.prefs,disciplinePoints:{...scores,english},englishQuiz:next,...(next.index===next.order.length?{englishGames:(Number(me.prefs?.englishGames)||0)+1}:{})});
+      return res.json({correct:ok,solution:expected,index:next.index,total:next.order.length,points:english,finished:next.index===next.order.length,grade:Math.round(next.correct/next.order.length*100)/10});
+    }
+    if(action==='rankingDiscipline'){
+      const discipline=String(body.discipline||'');
+      if(!/^[a-z][a-zA-Z0-9_-]{1,30}$/.test(discipline))return res.json({error:'Disciplina no vàlida.'},400);
+      const all=await users.list({queries:[Query.limit(100)]});
+      const ranking=(all.users||[]).map(u=>({id:u.$id,nom:u.name||u.email?.split('@')[0]||'Jugador',punts:Number(u.prefs?.disciplinePoints?.[discipline])||0,partides:discipline==='english'?Number(u.prefs?.englishGames)||0:0})).filter(x=>x.partides>0).sort((a,b)=>b.punts-a.punts).slice(0,100);
+      return res.json({ranking});
+    }
   }
   if(!['presence','me','ranking'].includes(action))
     return res.json({error:'Els nous continguts de EsoSa arribaran aviat.'},503);
@@ -178,12 +190,13 @@ export default async ({req,res,error})=>{
   }
   if(action==='me'){
     const p=await perfil();
-    return res.json({nom:p.nom,punts:p.punts,partides:p.partides,encerts:p.encerts,errors:p.errors,dominat:p.punts>=10000});
+    const scores=me.prefs?.disciplinePoints||{};
+    const total=Number(p.punts||0)+Object.values(scores).reduce((sum,value)=>sum+(Number(value)||0),0);
+    return res.json({nom:p.nom,punts:p.punts,puntsTotals:total,partides:p.partides,encerts:p.encerts,errors:p.errors,dominat:p.punts>=10000});
   }
   if(action==='ranking'){
     const r=await tables.listRows({databaseId:DB,tableId:PERFILS,queries:[Query.orderDesc('punts'),Query.limit(100)]});
-    const ranking=await Promise.all((r.rows||r.documents||[]).map(async (x,i)=>({id:x.$id,posicio:i+1,nom:await nomUsuari(x.$id,x.nom),punts:x.punts,partides:x.partides,presencia:Object.values(presenceMap(x.presencia)).some(v=>v.status==='playing')?'playing':Object.keys(presenceMap(x.presencia)).length?'online':null})));
-    return res.json({ranking});
+    return res.json({ranking:(r.rows||r.documents||[]).map((x,i)=>({id:x.$id,posicio:i+1,nom:x.nom,punts:x.punts,partides:x.partides,presencia:Object.values(presenceMap(x.presencia)).some(v=>v.status==='playing')?'playing':Object.keys(presenceMap(x.presencia)).length?'online':null}))});
   }
 
   if(action==='recommendations'){
