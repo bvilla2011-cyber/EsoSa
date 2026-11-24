@@ -493,7 +493,46 @@ export const ENGLISH_UNIT_QUESTIONS = [
     "answer": 0,
     "explanation": "To pull the plug on something means to stop or end it."
   }
-];
+,
+{
+  "id": "modifier-gradable",
+  "topic": "Adverbs as modifiers",
+  "prompt": "Choose a natural modifier: The curry is ___ spicy, so I need some water.",
+  "options": [
+    "very",
+    "absolutely",
+    "utterly",
+    "complete"
+  ],
+  "answer": 0,
+  "explanation": "Very, quite, rather, slightly and extremely modify gradable adjectives such as spicy."
+},
+{
+  "id": "modifier-extreme",
+  "topic": "Adverbs as modifiers",
+  "prompt": "Choose the natural modifier: The meal was ___ delicious.",
+  "options": [
+    "absolutely",
+    "slightly",
+    "a bit",
+    "quite a"
+  ],
+  "answer": 0,
+  "explanation": "Absolutely and utterly commonly modify extreme adjectives such as delicious."
+},
+{
+  "id": "prefix-un",
+  "topic": "Negative prefixes",
+  "prompt": "Choose the opposite of fair.",
+  "options": [
+    "unfair",
+    "inpublic",
+    "disfair",
+    "irfair"
+  ],
+  "answer": 0,
+  "explanation": "Fair takes the negative prefix un-: unfair."
+}];
 
 export const ENGLISH_UNIT_FLASHCARDS = [
   [
@@ -681,7 +720,10 @@ export const ENGLISH_UNIT_FLASHCARDS = [
     "Develop at least one reason for and one reason against.",
     "Explain each reason with an example or consequence."
   ]
-];
+,
+["Adverbs with gradable adjectives","slightly / a little → quite / rather → very / really → extremely","Use these with adjectives that can have degrees: slightly spicy, very cold, extremely tasty."],
+["Adverbs with extreme adjectives","absolutely / completely / utterly","Use these with strong adjectives: absolutely delicious, utterly exhausted."],
+["Negative prefix un-","fair → unfair; usual → unusual; friendly → unfriendly","Un- is a common negative prefix; learn the spelling with each word."]];
 
 export const ENGLISH_UNIT_PLAN = [
   [
