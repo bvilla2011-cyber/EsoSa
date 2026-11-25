@@ -9,12 +9,92 @@
 @page{size:A4;margin:14mm 15mm}
 @media print{body{background:#fff!important;color:#111!important}.layout,.exam-page{max-width:none!important;margin:0!important;padding:0!important}.exam-page>header,.intro,.model-nav,.no-print,.model-actions,footer{display:none!important}.paper-model{border:0!important;border-radius:0!important;padding:0!important;margin:0!important;box-shadow:none!important;display:block!important;break-before:page;page-break-before:always}.paper-model:first-of-type{break-before:auto;page-break-before:auto}.identity{break-inside:avoid;min-height:100px}.section{break-inside:avoid-page}.reading-text{font-size:10.5pt}.question{font-size:10.5pt}.text-block{background:#fff}.paper-title h2{font-size:15pt}.answer-space{print-color-adjust:exact;-webkit-print-color-adjust:exact}.intro{display:none!important}}
 @media print{body[data-print-model] .paper-model{display:none!important}body[data-print-model="A"] .paper-model[data-model="A"],body[data-print-model="B"] .paper-model[data-model="B"],body[data-print-model="C"] .paper-model[data-model="C"],body[data-print-model="D"] .paper-model[data-model="D"],body[data-print-model="E"] .paper-model[data-model="E"]{display:block!important;break-before:auto!important;page-break-before:auto!important}}
+
+/* Independent catalogue and printable exam view. */
+.exam-page{max-width:1080px;padding:0 24px}
+.exam-page>main{display:block;width:100%;padding:36px 0 48px;min-width:0}
+.exam-page>header{padding:20px 0}
+.exam-page .intro{margin:0 0 28px;padding:32px 34px;background:#fff;border:1px solid #e0e5ed;border-radius:20px;box-shadow:0 4px 24px #26364b08}
+.intro h1{letter-spacing:-.045em;max-width:700px;margin:8px 0 12px}
+.intro p{font-size:15px;color:#536278;margin:0 0 14px;max-width:760px}
+.intro .footnote{font-size:12px;margin:14px 0 0}
+.catalog-meta{display:flex;gap:10px;flex-wrap:wrap;margin:20px 0 0}
+.catalog-meta span{display:inline-flex;align-items:center;font-size:12px;font-weight:750;color:#355180;background:#edf2ff;border-radius:7px;padding:7px 10px}
+.catalog-heading{display:flex;justify-content:space-between;align-items:center;gap:12px;margin:0 0 15px}
+.catalog-heading h2{font-size:20px;margin:0;letter-spacing:-.025em}
+.catalog-heading small{font-size:12px;color:#647187}
+.model-nav{grid-template-columns:repeat(2,minmax(0,1fr));gap:14px;margin:0}
+.model-link{display:flex;flex-direction:column;min-width:0;padding:22px;border:1px solid #dce3ed;border-radius:16px;background:white;box-shadow:0 2px 10px #26364b06;transition:border-color .15s,box-shadow .15s;gap:12px}
+.model-link:hover{border-color:#a6b9e7;box-shadow:0 5px 18px #214ec412}
+.model-top{display:flex;align-items:center;gap:14px}
+.model-letter{display:grid;place-items:center;width:46px;height:46px;flex:0 0 46px;border-radius:12px;background:#edf2ff;color:#214ec4;font-size:22px;font-weight:850}
+.model-link h3{font-size:18px;line-height:1.3;margin:0 0 3px;letter-spacing:-.025em}
+.model-link p{font-size:13px;margin:0;color:#647187}
+.model-card-actions{display:flex;gap:8px;margin-top:3px}
+.model-card-actions .btn:first-child{flex:1}
+.model-card-actions .btn{min-height:43px;font-size:13px}
+.document-toolbar{display:flex;justify-content:space-between;align-items:center;gap:14px;max-width:830px;margin:0 auto 18px}
+.document-toolbar p{margin:0;font-size:13px;color:#647187}
+.document-toolbar h1{font-size:23px;letter-spacing:-.035em;margin:0 0 3px}
+.document-toolbar .btn{flex-shrink:0}
+.paper-model{max-width:830px;margin:0 auto;padding:42px 48px;border-radius:8px;border-color:#e0e5ed;box-shadow:0 10px 36px #1724380a}
+.identity{border:2px solid #172438;grid-template-columns:100px 1fr;min-height:102px;border-radius:3px;overflow:hidden;margin-bottom:25px}
+.logo-box{border-right:2px solid #172438}.logo-box strong{font-size:36px;text-shadow:none;color:#214ec4;letter-spacing:-3px}
+.student-fields{gap:11px;padding:10px 20px}
+.student-line{font-size:16px;font-weight:650;align-items:baseline;gap:12px}
+.student-line i{border-bottom:1.5px solid #172438;height:1.1em}
+.paper-title{align-items:flex-start;gap:16px;padding-bottom:14px;margin-bottom:14px;border-bottom:1.5px solid #172438}
+.paper-title h2{font-size:24px;letter-spacing:-.035em;line-height:1.25}
+.exam-meta{font-size:12px;line-height:1.6;flex-shrink:0}
+.instructions{font-size:13px;border-left:3px solid #214ec4;background:#f5f7fc;border-radius:0 5px 5px 0;padding:12px 14px;margin:0 0 25px}
+.section{margin:26px 0 30px;break-inside:auto}
+.section-title{align-items:center;gap:10px;border-bottom:1px solid #c5d1e3;padding:0 0 9px;margin-bottom:13px;break-after:avoid}
+.section-title h3{font-size:16px;line-height:1.35;color:#244d83;letter-spacing:-.012em}
+.points{font-size:12px;color:#244d83;background:#edf2ff;padding:5px 8px;border-radius:5px}
+.reading-text{font-size:16px;line-height:1.75;text-align:left;padding:16px 18px;border:1px solid #e0e5ed;background:#fafbfc;border-radius:6px}
+.question{font-size:14px;line-height:1.6;font-weight:400;white-space:normal;margin:14px 0 6px;break-inside:avoid}
+.qhead strong{font-weight:600}
+.mark{font-size:12px;color:#52627a}
+.answer-space{background:repeating-linear-gradient(to bottom,transparent 0,transparent 25px,#b7c0ca 25px,#b7c0ca 26px);break-inside:avoid}
+.fill-line{font-size:14px;break-inside:avoid}
+.writing-rubric{font-size:13px;break-inside:avoid}
+.total-line{font-size:16px}
+.paper-model .model-actions{margin:24px 0 0}
+#printAllModels{display:none}
+@media(max-width:650px){
+ .exam-page{padding:0 14px}.exam-page>main{padding:22px 0 30px}.exam-page>header{padding:14px 0}
+ .exam-page .intro{padding:22px 19px;margin-bottom:23px}.model-nav{grid-template-columns:1fr;gap:10px}.model-link{padding:17px}.model-link h3{font-size:17px}
+ .document-toolbar{align-items:flex-start;gap:8px}.document-toolbar h1{font-size:18px}.document-toolbar p{font-size:11px}
+ .paper-model{padding:20px 15px}.identity{grid-template-columns:70px 1fr;min-height:85px}.logo-box strong{font-size:28px}.logo-box span{font-size:12px}.student-fields{padding:8px 12px}.student-line{font-size:14px}
+ .paper-title{flex-direction:column;gap:5px}.paper-title h2{font-size:20px}.exam-meta{text-align:left}.reading-text{font-size:15px;padding:12px}.section-title h3{font-size:14px}.question,.fill-line{font-size:13px}.qhead{gap:8px}.mark{font-size:11px}.model-card-actions .btn{padding:8px 12px}
+}
+@media print{
+ .exam-page>main{display:block!important;padding:0!important}
+ .catalog-heading,.document-toolbar,.catalog-only{display:none!important}
+ #printAllModels{display:block!important}
+ .paper-model{max-width:none!important;break-before:auto;page-break-before:auto}
+ #printAllModels .paper-model+.paper-model{break-before:page;page-break-before:always}
+ .identity{border:2px solid #111;min-height:80px;margin-bottom:16px}.logo-box{border-right:2px solid #111}.logo-box strong{color:#111}.student-line{font-size:12pt}
+ .paper-title{border-color:#111}.paper-title h2{font-size:15pt}.exam-meta{font-size:9pt}
+ .section{break-inside:auto;page-break-inside:auto;margin:16px 0 20px}.section-title{break-after:avoid;page-break-after:avoid;border-color:#777}
+ .section-title h3,.points,.mark{color:#111}.points{background:none;padding:0;font-size:10pt}
+ .question{font-size:10pt;break-inside:avoid}.qhead strong{font-weight:600}
+ .instructions{font-size:9pt;background:none;border-color:#777}.reading-text{font-size:10.5pt;padding:0;border:0;background:none;line-height:1.5}
+ .answer-space{print-color-adjust:exact;-webkit-print-color-adjust:exact}
+ .fill-line{font-size:10pt}.writing-rubric{font-size:9pt}.total-line{font-size:12pt}
+}
+
 </style></head>
 <body><div class="layout exam-page">
 <header class="no-print"><div class="brand"><span class="symbol">ES</span><div><strong>EsoSa</strong><small>Aprèn · Practica · Millora</small></div></div><a class="btn small" href="./">← Tornar a EsoSa</a></header>
 <main>
-<section class="intro no-print"><div class="eyebrow">Català · 4t d’ESO · 1a avaluació</div><h1>Cinc models d’examen en paper</h1><p>Simulacres de nivell de 4t d’ESO, preparats per imprimir i respondre a mà. Tots cobreixen comprensió d’un text argumentatiu, coherència i adequació, estructura argumentativa, apòstrof i contraccions, lèxic i redacció. No hi ha preguntes tipus test. Cada model suma exactament 10 punts.</p><p><strong>Repartiment:</strong> comprensió 2,0 · propietats textuals 1,2 · argumentació 1,4 · ortografia 1,8 · lèxic 1,6 · redacció 2,0.</p><div class="model-actions"><button class="btn primary" onclick="printAll()">Imprimir els cinc models</button></div><p class="footnote">La pauta de redacció assigna els punts segons els criteris indicats. Les respostes s’han de desenvolupar a mà.</p></section>
-<nav class="model-nav no-print" aria-label="Models d’examen" id="modelNav"></nav><div id="models"></div>
+<div id="catalog" class="catalog-only no-print">
+<section class="intro"><div class="eyebrow">Català · 4t d’ESO · 1a avaluació</div><h1>Models d’examen</h1><p>Cinc simulacres complets de llengua catalana per imprimir i respondre a mà. Tria un model per obrir el document en una pestanya nova.</p><div class="catalog-meta"><span>5 models</span><span>6 apartats per model</span><span>10 punts</span><span>Sense tipus test</span></div></section>
+<div class="catalog-heading"><div><h2>Tria un model</h2><small>Cada model és un document independent.</small></div><button class="btn small" type="button" id="printAllButton">Imprimir tots</button></div>
+<nav class="model-nav" aria-label="Models d’examen" id="modelNav"></nav></div>
+<div id="documentToolbar" class="document-toolbar no-print" hidden><div><h1 id="documentTitle"></h1><p>Document imprimible · Català · 4t d’ESO</p></div><button class="btn primary" type="button" id="printButton">Imprimir</button></div>
+<div id="models"></div><div id="printAllModels" aria-hidden="true"></div>
+<noscript><p>Cal activar JavaScript per consultar els models d’examen.</p></noscript>
 </main><footer class="no-print">EsoSa · Simulacres de Català · 4t ESO</footer></div>
 <script>
 (()=>{'use strict';
@@ -69,10 +149,35 @@ let lexContent='<p class="question"><strong>'+esc(m.lexIntro)+'</strong></p>';if
 lexContent+=m.lexItems.map((q,i)=>question(q[0],q[1]||'n2',m.lexPassage?0.8:0.2,i+1)).join('');
 c+=section('5. Lèxic · '+esc(m.lexTitle),1.6,lexContent);
 c+=section('6. Redacció · text argumentatiu',2.0,'<p class="question"><strong>'+esc(m.writing)+'</strong></p><div class="answer-space n10"></div><table class="writing-rubric"><thead><tr><th>Criteri de correcció</th><th>Punts</th></tr></thead><tbody><tr><td>Tesi clara i adequada al tema.</td><td>0,4</td></tr><tr><td>Dos arguments desenvolupats amb explicació o exemple pertinent.</td><td>0,6</td></tr><tr><td>Objecció i resposta coherents amb la tesi.</td><td>0,4</td></tr><tr><td>Connectors variats i ben emprats.</td><td>0,3</td></tr><tr><td>Conclusió, coherència global, adequació i revisió lingüística.</td><td>0,3</td></tr></tbody></table>');
-c+='<div class="total-line">PUNTUACIÓ TOTAL: ______ / 10</div><p class="footnote">Comprovació: 2,0 + 1,2 + 1,4 + 1,8 + 1,6 + 2,0 = 10 punts.</p><div class="model-actions no-print"><button class="btn primary" onclick="printModel(\''+m.id+'\')">Imprimir el model '+m.id+'</button><a class="btn" href="#modelNav">Tornar a la llista</a></div></article>';return c;}
-function printModel(id){document.body.dataset.printModel=id;window.print();setTimeout(()=>delete document.body.dataset.printModel,600);}
-function printAll(){delete document.body.dataset.printModel;window.print();}
-document.getElementById('modelNav').innerHTML=models.map(m=>'<a class="model-link" href="#model-'+m.id+'"><h3>'+esc(m.title)+'</h3><p>Text argumentatiu · 10 punts</p><button class="btn secondary full" type="button" onclick="event.preventDefault();printModel(\''+m.id+'\')">Imprimir aquest model</button></a>').join('');
-document.getElementById('models').innerHTML=models.map(renderModel).join('');
+c+='<div class="total-line">PUNTUACIÓ TOTAL: ______ / 10</div><p class="footnote">Comprovació: 2,0 + 1,2 + 1,4 + 1,8 + 1,6 + 2,0 = 10 punts.</p><div class="model-actions no-print"><button class="btn primary" type="button" data-print-current>Imprimir el model '+m.id+'</button><a class="btn" href="./examens-catala-paper.html">Tornar als models</a></div></article>';return c;}
+const params=new URLSearchParams(location.search);
+const selected=models.find(m=>m.id===(params.get('model')||'').toUpperCase());
+const catalog=document.getElementById('catalog');
+const host=document.getElementById('models');
+const printHost=document.getElementById('printAllModels');
+const nav=document.getElementById('modelNav');
+const toolbar=document.getElementById('documentToolbar');
+const printButton=document.getElementById('printButton');
+const print=()=>window.print();
+const modelUrl=id=>'./examens-catala-paper.html?model='+encodeURIComponent(id);
+if(selected){
+ catalog.hidden=true;
+ toolbar.hidden=false;
+ document.title=selected.title+' · Català · EsoSa';
+ document.getElementById('documentTitle').textContent=selected.title;
+ host.innerHTML=renderModel(selected);
+ printButton.addEventListener('click',print);
+ host.querySelector('[data-print-current]').addEventListener('click',print);
+ const back=document.querySelector('.exam-page>header>a');
+ back.href='./examens-catala-paper.html';
+ back.textContent='← Models';
+ if(params.get('print')==='1'){window.addEventListener('load',()=>window.print(),{once:true});}
+}else{
+ nav.innerHTML=models.map(m=>'<article class="model-link"><div class="model-top"><span class="model-letter" aria-hidden="true">'+m.id+'</span><div><h3>'+esc(m.title.split(' · ').slice(1).join(' · '))+'</h3><p>Model '+m.id+' · 10 punts · 6 apartats</p></div></div><div class="model-card-actions"><a class="btn primary" href="'+modelUrl(m.id)+'" target="_blank" rel="noopener">Obrir examen ↗</a><a class="btn" href="'+modelUrl(m.id)+'&amp;print=1" target="_blank" rel="noopener" aria-label="Imprimir model '+m.id+'">Imprimir</a></div></article>').join('');
+ document.getElementById('printAllButton').addEventListener('click',()=>{
+  if(!printHost.hasChildNodes()) printHost.innerHTML=models.map(renderModel).join('');
+  print();
+ });
+}
 })();
 </script></body></html>
