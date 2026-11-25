@@ -35,6 +35,8 @@
   }
   function clearChallenge(){try{sessionStorage.removeItem('lexic4:challenge')}catch{}}
   async function enterHome(){
+    const moderation=await api({action:'banStatus'});
+    if(moderation.banned){renderBanned();return;}
     clearChallenge();
     if(state.pendingCourse&&state.user?.email?.toLowerCase()===state.pendingCourse.email){await account.updatePrefs({course:state.pendingCourse.course,level:state.pendingCourse.level,classGroup:state.pendingCourse.classGroup});state.user=await account.get();state.pendingCourse=null;}
     const course=state.user?.prefs?.course;
@@ -46,6 +48,13 @@
     if(!course||!state.user?.prefs?.level||!state.user?.prefs?.classGroup){renderOnboarding();return;}
     cache.set('device',{email:state.user.email,lastUsed:Date.now()});
     state.authMode=null;await home();
+  }
+
+  function renderBanned(){
+    activateSession();
+    viewVersion++;autoTimers.forEach(clearTimeout);autoTimers=[];
+    el.innerHTML='<div class="panel narrow center ban-screen" role="alert"><h1>@bvilla te ha baneado.</h1><p class="sub">El teu accés a EsoSa està restringit.</p><button class="btn primary" id="bannedLogout">Tancar sessió</button></div>';
+    document.getElementById('bannedLogout').onclick=()=>document.getElementById('logout')?.click();
   }
 
   function renderOnboarding(){
@@ -129,6 +138,10 @@
     }
     if(r.status==='failed')throw Object.assign(Error('El servidor no ha pogut desar la resposta. Torna-ho a provar; no es repetiran els punts.'),{code:r.responseStatusCode||503});
     let data={};try{data=JSON.parse(r.responseBody||'{}')}catch{throw Error('Resposta no vàlida del servidor.')}
+    if(typeof data.error==='string'&&data.error.startsWith('BANNED:')){
+      renderBanned();
+      throw Object.assign(Error(data.error.slice('BANNED:'.length)),{code:403,banned:true});
+    }
     if(data.error||r.responseStatusCode>=400)throw Object.assign(Error(data.error||'Error del servidor.'),{code:r.responseStatusCode});
     if(!r.responseBody)throw Error('El servidor no ha retornat dades. Torna-ho a provar.');
     return data;
