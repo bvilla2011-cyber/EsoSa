@@ -95,6 +95,12 @@ export default async ({req,res,error})=>{
   const sessClient=new Client().setEndpoint(process.env.APPWRITE_FUNCTION_API_ENDPOINT||'https://fra.cloud.appwrite.io/v1').setProject(process.env.APPWRITE_FUNCTION_PROJECT_ID).setJWT(jwt);
   const me=await new (await import('node-appwrite')).Account(sessClient).get();
   if(me.$id!==userId) return res.json({error:'Sessió no vàlida.'},401);
+  // A ban is kept in a secret Appwrite Function variable, keyed by immutable Auth user IDs.
+  // The browser cannot change this list; administrators manage it in the Appwrite console.
+  const bannedUserIds=new Set(String(process.env.BANNED_USER_IDS||'').split(',').map(id=>id.trim()).filter(Boolean));
+  const banned=bannedUserIds.has(userId);
+  if(action==='banStatus')return res.json({banned,message:banned?'@bvilla te ha baneado.':null});
+  if(banned)return res.json({error:'BANNED:@bvilla te ha baneado.'},403);
   if(me.prefs?.course!=='4t ESO'||!['A','B','C1','C2'].includes(me.prefs?.level)||!['A','B','C'].includes(me.prefs?.classGroup))
     return res.json({error:'Cal confirmar que ets de 4t d’ESO i indicar el nivell flexible i el grup classe.'},403);
   const read=async (table,rowId)=>tables.getRow({databaseId:DB,tableId:table,rowId});
