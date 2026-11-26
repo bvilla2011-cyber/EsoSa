@@ -350,7 +350,7 @@
     for(let i=copy.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[copy[i],copy[j]]=[copy[j],copy[i]];}
     return copy;
   };
-  const normalizeArgumentAnswer=value=>String(value||'').toLowerCase().normalize('NFD').replace(/[\\u0300-\\u036f]/g,'').replace(/[’']/g,'').replace(/[^a-z0-9]+/g,' ').trim();
+  const normalizeArgumentAnswer=value=>String(value||'').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/[’']/g,'').replace(/[^a-z0-9]+/g,' ').trim();
   function argumentAnswerIsCorrect(value,type){
     const item=argumentQuizModule.ARGUMENT_TYPES.find(x=>x.id===type);
     if(!item)return false;
