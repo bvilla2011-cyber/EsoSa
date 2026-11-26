@@ -89,7 +89,7 @@
 <header class="no-print"><div class="brand"><span class="symbol">ES</span><div><strong>EsoSa</strong><small>Aprèn · Practica · Millora</small></div></div><a class="btn small" href="./">← Tornar a EsoSa</a></header>
 <main>
 <div id="catalog" class="catalog-only no-print">
-<section class="intro"><div class="eyebrow">Català · 4t d’ESO · 1a avaluació</div><h1>Models d’examen</h1><p>Cinc simulacres complets de llengua catalana per imprimir i respondre a mà. Tria un model per obrir el document en una pestanya nova.</p><div class="catalog-meta"><span>5 models</span><span>6 apartats per model</span><span>10 punts</span><span>Sense tipus test</span></div></section>
+<section class="intro"><div class="eyebrow">Català · 4t d’ESO · 1a avaluació</div><h1>Models d’examen</h1><p>Cinc simulacres complets de llengua catalana per imprimir i respondre a mà. Tria un model per obrir el document en una pestanya nova.</p><div class="catalog-meta"><span>5 models</span><span>5 apartats per model</span><span>10 punts</span><span>Sense tipus test</span></div></section>
 <div class="catalog-heading"><div><h2>Tria un model</h2><small>Cada model és un document independent.</small></div><button class="btn small" type="button" id="printAllButton">Imprimir tots</button></div>
 <nav class="model-nav" aria-label="Models d’examen" id="modelNav"></nav></div>
 <div id="documentToolbar" class="document-toolbar no-print" hidden><div><h1 id="documentTitle"></h1><p>Document imprimible · Català · 4t d’ESO</p></div><button class="btn primary" type="button" id="printButton">Imprimir</button></div>
@@ -140,22 +140,33 @@ const esc=s=>String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;'
 function question(text,space,points,index){return '<div class="question"><div class="qhead"><strong>'+index+'. '+esc(text)+'</strong><span class="mark">('+Number(points).toLocaleString('ca-ES',{minimumFractionDigits:1,maximumFractionDigits:2})+' punts)</span></div><div class="answer-space '+space+'"></div></div>';}
 function header(){return '<div class="identity"><div class="logo-box" aria-label="Logo EsoSa"><strong>ES</strong><span>EsoSa</span></div><div class="student-fields"><div class="student-line"><span>Nom:</span><i></i></div><div class="student-line"><span>Data:</span><i></i></div></div></div>';}
 function section(name,pts,content){return '<section class="section"><div class="section-title"><h3>'+name+'</h3><span class="points">'+pts.toLocaleString('ca-ES',{minimumFractionDigits:1})+' punts</span></div>'+content+'</section>';}
-function renderModel(m){let c='<article class="paper-model" id="model-'+m.id+'" data-model="'+m.id+'">'+header()+'<div class="paper-title"><h2>'+esc(m.title)+'</h2><div class="exam-meta">Llengua catalana · 4t d’ESO<br>1a avaluació · Qualificació: ____ / 10</div></div><p class="instructions"><strong>Instruccions:</strong> Cada apartat és independent, excepte les preguntes de comprensió lectora, que fan referència únicament al text que les acompanya. Respon amb frases completes. En ortografia, escriu la forma correcta; en la redacció, planifica, argumenta i revisa. No hi ha preguntes tipus test.</p>';
-c+=section('1. Comprensió lectora · text argumentatiu',2.0,'<div class="reading-text">'+esc(m.reading)+'</div>'+m.comprehension.map((q,i)=>question(q[0],q[1],q[2],i+1)).join(''));
-c+=section('2. Opinió i argumentació · exercici independent',1.2,
-  question('Explica amb les teves paraules la diferència entre opinar i argumentar.','n2',0.4,1)+
-  question('Llegeix: «Cal reduir els residus perquè malbaratem els recursos». Quina opinió s’hi defensa? Hi ha argumentació? Identifica la raó.','n2',0.4,2)+
-  question('Indica si aquesta frase expressa una opinió, una tesi o un argument: «El mitjà informàtic estalvia temps i evita desplaçaments». Justifica la resposta.','n2',0.4,3));
-c+=section('3. Estructura i tipus d’arguments · exercici independent',1.4,
-  question('Escriu les parts principals d’un text argumentatiu i explica breument la funció de la tesi i de la conclusió.','n3',0.5,1)+
-  question('Classifica i justifica el tipus d’argument: «Segons l’Agència de Salut, caminar regularment beneficia la salut».','n2',0.4,2)+
-  question('Classifica i justifica el tipus d’argument: «Si reutilitzem els llibres, reduirem la despesa i evitarem llençar exemplars que encara serveixen».','n3',0.5,3));
+function renderModel(m){let c='<article class="paper-model" id="model-'+m.id+'" data-model="'+m.id+'">'+header()+'<div class="paper-title"><h2>'+esc(m.title)+'</h2><div class="exam-meta">Llengua catalana · 4t d’ESO<br>1a avaluació · Qualificació: ____ / 10</div></div><p class="instructions"><strong>Instruccions:</strong> Cada apartat és independent, excepte les preguntes de comprensió lectora, que fan referència únicament al text que les acompanya. Respon amb frases completes. En ortografia, escriu la forma correcta. No hi ha cap redacció.</p>';
+c+=section('1. Comprensió lectora',2.0,'<div class="reading-text">'+esc(m.reading)+'</div>'+m.comprehension.map((q,i)=>question(q[0],q[1],q[2],i+1)).join(''));
+c+=section('2. Opinar i argumentar · exercicis independents',2.0,
+  question('Defineix què és un text argumentatiu i explica la diferència entre opinar i argumentar.','n3',0.5,1)+
+  '<p class="question"><strong>Indica si cada enunciat expressa una opinió, un argument o només una informació. Quan hi hagi una opinió, escriu-la; quan hi hagi un argument, indica quina raó aporta. (3 × 0,25 = 0,75 punts)</strong></p>'+
+  question('«Els grafits són una forma d’art perquè poden transmetre missatges socials».','n2',0.25,2)+
+  question('«Dona sang. Salvaràs vides».','n2',0.25,3)+
+  question('«En la cirurgia estètica intervenen factors físics, psíquics i econòmics».','n2',0.25,4)+
+  '<p class="question"><strong>Digues si hi ha argumentació i assenyala la causa o la conseqüència que s’hi expressa. (2 × 0,25 = 0,5 punts)</strong></p>'+
+  question('«L’ús excessiu de pantalles pot dificultar el descans, perquè la llum i les notificacions mantenen l’atenció activa».','n2',0.25,5)+
+  question('«Cal reduir els residus perquè malbaratem els recursos que tenim».','n2',0.25,6)+
+  question('En l’expressió «En definitiva», quin valor té el connector: causa, oposició, exemple o conclusió?','n1',0.25,7));
+c+=section('3. Estructura i tipus d’arguments · exercicis independents',2.6,
+  question('Escriu les quatre parts habituals d’un text argumentatiu i explica breument què s’hi fa en la tesi i en la conclusió.','n3',0.6,1)+
+  '<p class="question"><strong>Classifica cada argument pel tipus principal i justifica la resposta breument. (6 × 0,3 = 1,8 punts)</strong></p>'+
+  question('«Segons l’Organització Mundial de la Salut, l’activitat física regular és beneficiosa».','n2',0.3,2)+
+  question('«La meva germana prepara la motxilla cada vespre i així no oblida els llibres; és un hàbit que podem imitar».','n2',0.3,3)+
+  question('«Si reutilitzem els llibres, estalviarem diners i evitarem llençar exemplars que encara serveixen».','n2',0.3,4)+
+  question('«Per exemple, al nostre institut el préstec de llibres ha permès que més alumnes tinguin lectures a casa».','n2',0.3,5)+
+  question('«La majoria de famílies enquestades prefereix tenir una zona verda al barri».','n2',0.3,6)+
+  question('«La mateixa norma de lliurament s’ha d’aplicar a tothom que hagi tingut les mateixes condicions».','n2',0.3,7)+
+  question('Explica què introdueix «Tanmateix» en un text argumentatiu: una causa, una oposició o una conclusió.','n1',0.2,8));
 c+=section('4. Ortografia · apòstrof i contraccions',1.8,'<p class="question"><strong>A. Completa cada buit amb la forma correcta. (8 × 0,1 = 0,8 punts)</strong></p>'+m.orthFill.map((q,i)=>'<div class="fill-line"><strong>'+(i+1)+'.</strong> '+esc(q[0])+' <span class="mark">(0,1)</span></div>').join('')+'<p class="question"><strong>B. Corregeix la frase sencera. Reescriu-la correctament. (4 × 0,15 = 0,6 punts)</strong></p>'+m.orthEdit.map((q,i)=>question(q[0],'n1',0.15,i+1)).join('')+'<p class="question"><strong>C. Explica la regla o l’excepció que cal aplicar. (2 × 0,2 = 0,4 punts)</strong></p>'+m.orthExplain.map((q,i)=>question(q[0],'n2',0.2,i+1)).join(''));
 let lexContent='<p class="question"><strong>'+esc(m.lexIntro)+'</strong></p>';if(m.wordBank)lexContent+='<div class="word-bank">Banc de mots: '+esc(m.wordBank)+'</div>';if(m.lexPassage)lexContent+='<div class="text-block">'+esc(m.lexPassage)+'</div>';
 lexContent+=m.lexItems.map((q,i)=>question(q[0],q[1]||'n2',m.lexPassage?0.8:0.2,i+1)).join('');
 c+=section('5. Lèxic · '+esc(m.lexTitle),1.6,lexContent);
-c+=section('6. Redacció · text argumentatiu',2.0,'<p class="question"><strong>'+esc(m.writing)+'</strong></p><div class="answer-space n10"></div><table class="writing-rubric"><thead><tr><th>Criteri de correcció</th><th>Punts</th></tr></thead><tbody><tr><td>Tesi clara i adequada al tema.</td><td>0,4</td></tr><tr><td>Dos arguments desenvolupats amb explicació o exemple pertinent.</td><td>0,6</td></tr><tr><td>Objecció i resposta coherents amb la tesi.</td><td>0,4</td></tr><tr><td>Connectors variats i ben emprats.</td><td>0,3</td></tr><tr><td>Conclusió, coherència global, adequació i revisió lingüística.</td><td>0,3</td></tr></tbody></table>');
-c+='<div class="total-line">PUNTUACIÓ TOTAL: ______ / 10</div><p class="footnote">Comprovació: 2,0 + 1,2 + 1,4 + 1,8 + 1,6 + 2,0 = 10 punts.</p><div class="model-actions no-print"><button class="btn primary" type="button" data-print-current>Imprimir el model '+m.id+'</button><a class="btn" href="./examens-catala-paper.html">Tornar als models</a></div></article>';return c;}
+c+='<div class="total-line">PUNTUACIÓ TOTAL: ______ / 10</div><p class="footnote">Comprovació: 2,0 + 2,0 + 2,6 + 1,8 + 1,6 = 10 punts.</p><div class="model-actions no-print"><button class="btn primary" type="button" data-print-current>Imprimir el model '+m.id+'</button><a class="btn" href="./examens-catala-paper.html">Tornar als models</a></div></article>';return c;}
 const params=new URLSearchParams(location.search);
 const selected=models.find(m=>m.id===(params.get('model')||'').toUpperCase());
 const catalog=document.getElementById('catalog');
