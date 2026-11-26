@@ -142,8 +142,14 @@ function header(){return '<div class="identity"><div class="logo-box" aria-label
 function section(name,pts,content){return '<section class="section"><div class="section-title"><h3>'+name+'</h3><span class="points">'+pts.toLocaleString('ca-ES',{minimumFractionDigits:1})+' punts</span></div>'+content+'</section>';}
 function renderModel(m){let c='<article class="paper-model" id="model-'+m.id+'" data-model="'+m.id+'">'+header()+'<div class="paper-title"><h2>'+esc(m.title)+'</h2><div class="exam-meta">Llengua catalana · 4t d’ESO<br>1a avaluació · Qualificació: ____ / 10</div></div><p class="instructions"><strong>Instruccions:</strong> llegeix el text amb atenció i respon amb frases completes. Justifica les interpretacions amb informació del text. En ortografia, escriu la forma correcta; en la redacció, planifica, argumenta i revisa. No hi ha preguntes tipus test.</p>';
 c+=section('1. Comprensió lectora · text argumentatiu',2.0,'<div class="reading-text">'+esc(m.reading)+'</div>'+m.comprehension.map((q,i)=>question(q[0],q[1],q[2],i+1)).join(''));
-c+=section('2. Coherència i adequació',1.2,m.coherence.map((q,i)=>question(q[0],q[1],q[2],i+1)).join(''));
-c+=section('3. El text argumentatiu',1.4,m.structure.map((q,i)=>question(q[0],q[1],q[2],i+1)).join(''));
+c+=section('2. Opinió i argumentació · exercici independent',1.2,
+  question('Explica amb les teves paraules la diferència entre opinar i argumentar.','n2',0.4,1)+
+  question('Llegeix: «Cal reduir els residus perquè malbaratem els recursos». Quina opinió s’hi defensa? Hi ha argumentació? Identifica la raó.','n2',0.4,2)+
+  question('Indica si aquesta frase expressa una opinió, una tesi o un argument: «El mitjà informàtic estalvia temps i evita desplaçaments». Justifica la resposta.','n2',0.4,3));
+c+=section('3. Estructura i tipus d’arguments · exercici independent',1.4,
+  question('Escriu les parts principals d’un text argumentatiu i explica breument la funció de la tesi i de la conclusió.','n3',0.5,1)+
+  question('Classifica i justifica el tipus d’argument: «Segons l’Agència de Salut, caminar regularment beneficia la salut».','n2',0.4,2)+
+  question('Classifica i justifica el tipus d’argument: «Si reutilitzem els llibres, reduirem la despesa i evitarem llençar exemplars que encara serveixen».','n3',0.5,3));
 c+=section('4. Ortografia · apòstrof i contraccions',1.8,'<p class="question"><strong>A. Completa cada buit amb la forma correcta. (8 × 0,1 = 0,8 punts)</strong></p>'+m.orthFill.map((q,i)=>'<div class="fill-line"><strong>'+(i+1)+'.</strong> '+esc(q[0])+' <span class="mark">(0,1)</span></div>').join('')+'<p class="question"><strong>B. Corregeix la frase sencera. Reescriu-la correctament. (4 × 0,15 = 0,6 punts)</strong></p>'+m.orthEdit.map((q,i)=>question(q[0],'n1',0.15,i+1)).join('')+'<p class="question"><strong>C. Explica la regla o l’excepció que cal aplicar. (2 × 0,2 = 0,4 punts)</strong></p>'+m.orthExplain.map((q,i)=>question(q[0],'n2',0.2,i+1)).join(''));
 let lexContent='<p class="question"><strong>'+esc(m.lexIntro)+'</strong></p>';if(m.wordBank)lexContent+='<div class="word-bank">Banc de mots: '+esc(m.wordBank)+'</div>';if(m.lexPassage)lexContent+='<div class="text-block">'+esc(m.lexPassage)+'</div>';
 lexContent+=m.lexItems.map((q,i)=>question(q[0],q[1]||'n2',m.lexPassage?0.8:0.2,i+1)).join('');
