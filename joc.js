@@ -340,6 +340,88 @@
     document.querySelectorAll('[data-exam]').forEach(button=>button.onclick=()=>examPractice(button.dataset.exam));
   }
 
+  let argumentQuizModule=null,argumentQuizRun=null;
+  async function loadArgumentQuiz(){
+    if(!argumentQuizModule)argumentQuizModule=await import('./src/argument-quiz.js');
+    return argumentQuizModule;
+  }
+  const shuffleArgumentItems=items=>{
+    const copy=[...items];
+    for(let i=copy.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[copy[i],copy[j]]=[copy[j],copy[i]];}
+    return copy;
+  };
+  const normalizeArgumentAnswer=value=>String(value||'').toLowerCase().normalize('NFD').replace(/[\\u0300-\\u036f]/g,'').replace(/[’']/g,'').replace(/[^a-z0-9]+/g,' ').trim();
+  function argumentAnswerIsCorrect(value,type){
+    const item=argumentQuizModule.ARGUMENT_TYPES.find(x=>x.id===type);
+    if(!item)return false;
+    const answer=normalizeArgumentAnswer(value);
+    return [item.id,item.label,...item.aliases].some(alias=>answer===normalizeArgumentAnswer(alias));
+  }
+  async function argumentQuizSetup(){
+    try{await loadArgumentQuiz();}
+    catch(error){show('<div class="panel"><h1>No s’ha pogut carregar el quiz</h1><p class="sub">'+escapeHTML(errorMessage(error))+'</p><button class="btn" id="argumentQuizBack">Tornar al pla de català</button></div>');document.getElementById('argumentQuizBack').onclick=()=>examPractice('catala');return;}
+    show('<div class="panel"><div class="eyebrow">Català · text argumentatiu</div><h1>Quiz: tipus d’arguments</h1><p class="sub">Tria quantes preguntes vols i com vols respondre. Les preguntes es barregen i no es repeteixen dins d’una mateixa partida.</p><label>Nombre de preguntes<select id="argumentQuizCount"><option value="10">10 preguntes</option><option value="20" selected>20 preguntes</option><option value="40">40 preguntes</option><option value="50">50 preguntes</option></select></label><div class="grid2" style="margin-top:16px"><section class="mode"><h3>Quiz tipus test</h3><p>Tria el tipus d’argument entre quatre opcions.</p><button class="btn primary full" data-argument-quiz="test">COMENÇAR TIPUS TEST</button></section><section class="mode"><h3>Quiz de resposta escrita</h3><p>Llegeix l’argument i escriu tu mateix de quin tipus és. No cal posar accents.</p><button class="btn primary full" data-argument-quiz="written">COMENÇAR ESCRIVINT</button></section></div><p class="hint">Inclou els 13 tipus dels apunts. La pràctica no modifica els punts ni el rànquing.</p><button class="btn full" id="argumentQuizBack">← Tornar al pla d’estudi català</button></div>');
+    document.getElementById('argumentQuizBack').onclick=()=>examPractice('catala');
+    document.querySelectorAll('[data-argument-quiz]').forEach(button=>button.onclick=()=>{
+      const count=Number(document.getElementById('argumentQuizCount').value);
+      const questions=shuffleArgumentItems(argumentQuizModule.ARGUMENT_QUESTIONS).slice(0,count);
+      argumentQuizRun={mode:button.dataset.argumentQuiz,questions,index:0,correct:0,answers:[]};
+      renderArgumentQuizQuestion();
+    });
+  }
+  function renderArgumentQuizQuestion(){
+    const run=argumentQuizRun;if(!run)return;
+    if(run.index>=run.questions.length){renderArgumentQuizResult();return;}
+    const q=run.questions[run.index],pct=Math.round(run.index/run.questions.length*100);
+    let answerArea='';
+    if(run.mode==='test'){
+      const correctType=argumentQuizModule.ARGUMENT_TYPES.find(t=>t.id===q.type);
+      const distractors=shuffleArgumentItems(argumentQuizModule.ARGUMENT_TYPES.filter(t=>t.id!==q.type)).slice(0,3);
+      const options=shuffleArgumentItems([correctType,...distractors]);
+      answerArea='<div class="stack">'+options.map(t=>'<label class="option"><input type="radio" name="argumentAnswer" value="'+escapeHTML(t.id)+'" required><span>'+escapeHTML(t.label)+'</span></label>').join('')+'</div>';
+    }else{
+      answerArea='<label>Escriu el tipus d’argument<input name="argumentAnswer" type="text" autocomplete="off" spellcheck="false" placeholder="Per exemple: argument d’exemple" required></label>';
+    }
+    show('<div class="panel"><div class="bar"><div class="eyebrow">Català · tipus d’arguments</div><strong>'+String(run.index+1)+' / '+String(run.questions.length)+'</strong></div><div class="progress"><div style="width:'+pct+'%"></div></div><p class="hint">'+(run.mode==='test'?'Tipus test':'Resposta escrita')+'</p><h2 class="question">'+escapeHTML(q.text)+'</h2><form id="argumentQuizForm" class="stack">'+answerArea+'<button class="btn primary full" id="argumentQuizSubmit" type="submit">COMPROVAR</button><div id="argumentQuizFeedback" hidden role="status"></div></form><button class="btn full" id="argumentQuizExit" style="margin-top:12px">SORTIR DEL QUIZ</button></div>');
+    const form=document.getElementById('argumentQuizForm');
+    form.onsubmit=e=>{
+      e.preventDefault();const button=document.getElementById('argumentQuizSubmit');if(button.dataset.answered)return;
+      const raw=new FormData(form).get('argumentAnswer');
+      const response=run.mode==='test'?String(raw||''):String(raw||'').trim();
+      const correct=run.mode==='test'?response===q.type:argumentAnswerIsCorrect(response,q.type);
+      const type=argumentQuizModule.ARGUMENT_TYPES.find(t=>t.id===q.type);
+      run.answers.push({question:q,response,correct});
+      if(correct)run.correct++;
+      const box=document.getElementById('argumentQuizFeedback');box.hidden=false;box.className='message '+(correct?'ok':'error');
+      box.innerHTML=(correct?'<strong>Correcte.</strong> ':'<strong>No és correcte.</strong> La resposta era <strong>'+escapeHTML(type.label)+'.</strong> ')+escapeHTML(q.why);
+      button.dataset.answered='true';button.hidden=true;
+      form.querySelectorAll('input').forEach(input=>input.disabled=true);
+      const next=document.createElement('button');next.type='button';next.className='btn primary full';next.textContent=run.index+1===run.questions.length?'VEURE RESULTATS':'SEGÜENT';
+      next.onclick=()=>{run.index++;renderArgumentQuizQuestion();};
+      box.after(next);
+    };
+    document.getElementById('argumentQuizExit').onclick=()=>{argumentQuizRun=null;argumentQuizSetup();};
+  }
+  function renderArgumentQuizResult(){
+    const run=argumentQuizRun;if(!run)return;
+    const attempted=argumentQuizModule.ARGUMENT_TYPES.map(type=>{
+      const rows=run.answers.filter(answer=>answer.question.type===type.id);
+      return {type,asked:rows.length,wrong:rows.filter(answer=>!answer.correct).length};
+    }).filter(row=>row.asked>0).sort((a,b)=>(b.wrong/b.asked)-(a.wrong/a.asked)||b.wrong-a.wrong);
+    const grade=Math.round(run.correct/run.questions.length*100)/10;
+    const summary=attempted.map(row=>'<div class="bar"><span>'+escapeHTML(row.type.label)+'</span><strong>'+row.wrong+' errors de '+row.asked+'</strong></div><div class="progress"><div style="width:'+Math.round(row.wrong/row.asked*100)+'%;background:'+(row.wrong?'#d45b5b':'#3b9b6a')+'"></div></div>').join('');
+    const hardest=attempted.filter(row=>row.wrong).slice(0,3);
+    const hardestText=hardest.length?'<p><strong>Els tipus que més t’han costat:</strong> '+hardest.map(row=>escapeHTML(row.type.label)+' ('+row.wrong+'/'+row.asked+')').join(' · ')+'</p>':'<p><strong>No has fallat cap tipus.</strong></p>';
+    const mistakes=run.answers.filter(answer=>!answer.correct);
+    const review=mistakes.length?'<details style="margin-top:18px"><summary>Revisar les '+mistakes.length+' errades</summary><div class="stack" style="margin-top:12px">'+mistakes.map(item=>{
+      const type=argumentQuizModule.ARGUMENT_TYPES.find(t=>t.id===item.question.type);
+      return '<section class="mode"><p>'+escapeHTML(item.question.text)+'</p><p><strong>La teva resposta:</strong> '+escapeHTML(item.response||'—')+'</p><p><strong>Correcta:</strong> '+escapeHTML(type.label)+'. '+escapeHTML(item.question.why)+'</p></section>';
+    }).join('')+'</div></details>':'';
+    show('<div class="panel"><div class="eyebrow">Quiz de tipus d’arguments · Resultat</div><h1>Has acabat!</h1><div class="score-row"><div class="scorebox"><strong>'+grade.toLocaleString('ca-ES')+' / 10</strong><small>Nota</small></div><div class="scorebox"><strong>'+run.correct+' / '+run.questions.length+'</strong><small>Encerts</small></div></div>'+hardestText+'<h2>Resultat per tipus</h2><div class="stack">'+summary+'</div>'+review+'<div class="stack" style="margin-top:20px"><button class="btn primary full" id="argumentQuizAgain">TORNAR A PRACTICAR</button><button class="btn full" id="argumentQuizHome">TORNAR AL PLA DE CATALÀ</button></div></div>');
+    document.getElementById('argumentQuizAgain').onclick=argumentQuizSetup;
+    document.getElementById('argumentQuizHome').onclick=()=>{argumentQuizRun=null;examPractice('catala');};
+  }
+
   function catalaNotes(){window.location.href='./apunts-catala.html?v=20261125';}
 
   function lexicPractice(){
@@ -369,8 +451,9 @@
     }
 
     if(id==='catala'){
-      show('<div class="panel"><div class="eyebrow">Pla d’estudi · Català</div><h1>Pla d’estudi català</h1><p class="sub">Continguts del trimestral: comprensió lectora, propietats textuals, text argumentatiu, ortografia i lèxic.</p><div class="grid2"><section class="mode"><h3>Apunts</h3><p>Guia completa i desenvolupada dels continguts de l’examen.</p><button class="btn primary full" id="openCatalaNotes">OBRIR APUNTS</button></section><section class="mode"><h3>Models imprimibles</h3><p>Cinc exàmens complets de 4t d’ESO, per respondre a mà i imprimir.</p><a class="btn primary full" href="./examens-catala-paper.html">OBRIR ELS CINC MODELS</a></section><section class="mode"><h3>Joc de Lèxic · 1r trimestre</h3><p>Recupera les pràctiques de lèxic, dites, catanyol, MIX i repàs personalitzat d’errors.</p><button class="btn secondary full" id="openLexicGame">OBRIR EL JOC</button></section></div><button class="btn full" id="backExams" style="margin-top:20px">← Tornar als exàmens</button></div>');
+      show('<div class="panel"><div class="eyebrow">Pla d’estudi · Català</div><h1>Pla d’estudi català</h1><p class="sub">Continguts del trimestral: comprensió lectora, propietats textuals, text argumentatiu, ortografia i lèxic.</p><div class="grid2"><section class="mode"><h3>Apunts</h3><p>Guia completa i desenvolupada dels continguts de l’examen.</p><button class="btn primary full" id="openCatalaNotes">OBRIR APUNTS</button></section><section class="mode"><h3>Quiz · Tipus d’arguments</h3><p>Practica els 13 tipus dels apunts. Tria 10, 20, 40 o 50 preguntes i respon amb opcions o escrivint.</p><button class="btn primary full" id="openArgumentQuiz">COMENÇAR QUIZ</button></section><section class="mode"><h3>Models imprimibles</h3><p>Cinc exàmens complets de 4t d’ESO, per respondre a mà i imprimir.</p><a class="btn primary full" href="./examens-catala-paper.html">OBRIR ELS CINC MODELS</a></section><section class="mode"><h3>Joc de Lèxic · 1r trimestre</h3><p>Recupera les pràctiques de lèxic, dites, catanyol, MIX i repàs personalitzat d’errors.</p><button class="btn secondary full" id="openLexicGame">OBRIR EL JOC</button></section></div><button class="btn full" id="backExams" style="margin-top:20px">← Tornar als exàmens</button></div>');
       document.getElementById('openCatalaNotes').onclick=catalaNotes;
+      document.getElementById('openArgumentQuiz').onclick=argumentQuizSetup;
       document.getElementById('openLexicGame').onclick=lexicPractice;
       document.getElementById('backExams').onclick=pickMode;
       return;
